@@ -38,9 +38,9 @@ details summary{cursor:pointer;color:var(--mute)}.check{display:grid;grid-templa
   <div class="brand"><span class="wordmark">Shield</span> · investor follow-ups · <span id="client"></span></div>
   <div class="conn" id="conn"></div>
   <div id="login" class="card" hidden>
-    <p class="label">Owner login</p>
-    <p>This page shows the real recipient and attachment, so it needs your Shield login. The link itself grants nothing.</p>
-    <input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><div class="row"><button class="approve" onclick="login()">Log in</button></div>
+    <p class="label">Log in</p><p style="margin:0 0 10px;color:var(--mute)">Use the password shown in Terminal when Shield started (line "Login password").</p>
+    
+    <input id="secret" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()"><div class="row"><button class="approve" onclick="login()">Log in</button></div>
   </div>
   <div id="view" hidden>
     <div class="card"><p class="label">Status</p><div id="state" class="state"></div><div id="status"></div>

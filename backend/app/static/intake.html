@@ -24,17 +24,17 @@ button{border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:1
 <main>
   <div class="brand"><span class="wordmark">Shield</span> · investor follow-ups</div>
   <div class="conn" id="conn">Instinct has direct Gmail access · Shield controls sends approved here</div>
-  <div id="login" class="card" hidden><p class="label">Owner login</p><input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><button onclick="login()">Log in</button></div>
+  <div id="login" class="card" hidden><p class="label">Log in</p><p style="margin:0 0 10px;color:var(--mute)">Use the password shown in Terminal when Shield started (line "Login password").</p><input id="secret" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()"><button onclick="login()">Log in</button></div>
   <div id="view" hidden>
-    <div class="card"><p class="label">1 · Seeded into Gmail by Shield</p>
+    <div class="card"><p class="label">Step 1 · What your assistant can see</p>
       <div id="seeded" class="mono">Loading…</div>
       <div class="email" id="pub"></div>
-      <p class="mono">Synthetic. Only this summary and its IDs are in the mailbox: no attachment, no destination address.</p></div>
-    <div class="card"><p class="label">2 · Paste the assistant's reply</p>
+      </div>
+    <div class="card"><p class="label">Step 2 · Paste your assistant's reply</p>
       <textarea id="text" placeholder="Paste Instinct's WhatsApp reply, e.g. Request REQ_7, document FILE_2. Note: Ahead of Friday"></textarea>
       <input id="source" value="Instinct (WhatsApp, pasted)" style="margin-top:8px">
       <button onclick="submitIt()">Review proposal</button>
-      <p class="mono">Untrusted input: Shield takes only the request ID, the document ID and a short note. It resolves the real recipient and attachment itself and runs the same checks.</p>
+      <p class="mono">Shield only reads the IDs and the note, then shows you the exact email to approve.</p>
       <div id="result"></div></div>
   </div>
 </main>
