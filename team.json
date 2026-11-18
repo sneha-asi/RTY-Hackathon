@@ -1,9 +1,9 @@
 {
-  "team_name": "CHANGE_ME",
-  "project_title": "CHANGE_ME",
-  "one_liner": "CHANGE_ME: one sentence about what you're building",
-  "track": "CHANGE_ME: physical-world | ai-agents | area-of-expertise",
+  "team_name": "Axon",
+  "project_title": "Axon Voice",
+  "one_liner": "A phone-call AI that executes a founder's post-meeting commitments safely: the AI talks, deterministic code decides, and nothing is done until it's verified.",
+  "track": "ai-agents",
   "members": [
-    { "name": "CHANGE_ME", "github": "CHANGE_ME" }
+    { "name": "Sneha", "github": "sneha-asi" }
   ]
 }
