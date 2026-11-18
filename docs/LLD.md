@@ -1,26 +1,36 @@
 # Shield — Low-Level Design (M0)
 
-Companion to [PRD.md](PRD.md). This document covers the hackathon slice (PRD §10: **Enforce mode for email, calendar and files**) at the level of modules, data shapes, algorithms and tests. §14 shows how the same pieces extend to any source and action in the full product.
+| Field | Detail |
+|---|---|
+| Team | Axon |
+| Product | Shield |
+| Scope | M0: Enforce mode (MCP) for email, files and calendar free/busy (PRD §10) |
+| Related docs | [PRD](PRD.md) (first principles B1–B6, invariants I1–I10, requirements F1–F23) · [HLD](HLD.md) (design principles D1–D9, trust boundaries) · [One-pager](ONE_PAGER.md) |
+
+This document specifies modules, data shapes, algorithms, APIs and tests. Every mechanism names the PRD invariant it implements. §14 shows how the same pieces extend to any source and action.
 
 ---
 
 ## 1. Design rules
 
-1. **No LLM inside Shield.** Every decision is a pure function of seed data, session state and the proposal.
-2. **Fail closed.** Any exception in resolve or check → `BLOCKED` with `reason="internal: <ExcType>"`. Nothing executes after an error.
-3. **Privacy is enforced at the tool interface.** Tool results are built only from handles, structured attributes and server-written summaries. Raw source text, addresses, paths and bytes stay in server memory. Detection and quarantine are extra safeguards, not the guarantee.
-4. **Code writes every status string** the assistant relays.
-5. **Logs hold IDs, labels and hashes**, never bodies, addresses or attachment bytes.
-6. **Illegal state transitions raise.** A bug must never look like progress.
+| Rule | Invariant |
+|---|---|
+| **Shield writes every byte the model receives.** Tool results are built only from handles, structured attributes and template summaries. Raw source text, addresses, paths and bytes stay in server memory. Detection and quarantine are extra safeguards | I1, I2 |
+| **No tool acts.** Read tools return releases; action tools return proposals. There is no approve tool | I3 |
+| **No LLM inside Shield.** Every decision is a pure function of seed data, session state and the proposal | HLD D4 |
+| **Fail closed.** Any exception in resolve, check or summarise → `BLOCKED` / withheld with `reason="internal: <ExcType>"`. Nothing executes after an error | I9 |
+| **Code writes every status string** the assistant relays | I7 |
+| **Logs hold IDs, labels and hashes**, never bodies, addresses or attachment bytes | I8 |
+| **Illegal state transitions raise.** A bug must never look like progress | I7 |
 
 ## 2. Code layout
 
-The existing `backend/app/` package is kept. Voice-specific modules are retired.
+Package `backend/app/`. Modules already in the repo that are not listed below are removed in slice 1.
 
 ```
 backend/
   app/
-    config.py        KEEP  settings from env (rename AXON_* → SHIELD_*)
+    config.py        KEEP  settings from env (SHIELD_* keys, §13)
     seed.py          KEEP  JSON loader, <<PLACEHOLDER>> fill, sha256 at startup; extend for emails/events
     events.py        KEEP  becomes ledger.py core (append-only, seq, SSE tail)
     models.py        REWRITE  Shield models (§3)
@@ -37,7 +47,6 @@ backend/
     mcp_server.py    NEW   FastMCP wrapping tools.py
     harness.py       NEW   Direct vs Shielded runs, scoring
     main.py          NEW   FastAPI: REST, SSE, approvals, dev, mounts MCP at /mcp
-    auth.py, resolve.py, extract.py   RETIRE (phone-call PIN, spoken names, transcript extraction)
   data/              contacts.json, files.json (extend) + emails.json, events.json (new)
   files/             demo files (PDF/TXT); copied to a runtime dir at startup
   tests/
@@ -737,7 +746,7 @@ GMAIL_TOKEN=token.json
 ANTHROPIC_API_KEY=
 FOUNDER_NAME=… FOUNDER_TEST_GMAIL=… INVESTOR_TEST_GMAIL=… (+ other contact placeholders)
 ```
-Remove the `BOLNA_*`, `FOUNDER_PIN` and `FOUNDER_PHONE_E164` keys. Add `runtime/` to `.gitignore`.
+`.env.example` lists exactly these keys. Add `runtime/` to `.gitignore`.
 
 New dependencies: `mcp`, `beautifulsoup4`, `sse-starlette`.
 
@@ -767,25 +776,27 @@ class ActionSpec(Protocol):             # send_document, reply, event today; pay
 
 ## 15. Test plan (`backend/tests/`)
 
-| File | Covers |
-|---|---|
-| `test_detectors.py` | Each detector: ≥2 positive, ≥2 negative (bad Verhoeff, bad Luhn, wrong PAN 4th char, UPI vs email) |
-| `test_cleaner.py` | Each hidden rule; zero-width; padding; instruction patterns; trusted vs untrusted; newsletter preheader not quarantined; A1, A2, A3 quarantined |
-| `test_handles.py` | Stable within a session, different across sessions; unknown → SENDER; no `@` or path in any attr |
-| `test_broker.py` | Per purpose: released/withheld ids; demo task measured (target ≤4 released, 0 sensitive fixture values); `shareable=false` files never listed |
-| `test_guard_checks.py` | WHO (A4, raw address A5, unknown handle); WHAT (Priya → v3, Karan → teaser, v2 → v3 warn); POLICY (secrets, hr never); CONTENT (URL, image, handle, PAN, length) |
-| `test_state_machine.py` | Every legal transition; every illegal one raises; double approve sends once; reject after approve is a no-op |
-| `test_approval_auth.py` | No cookie → 401; wrong seal → 409 and state unchanged; no approve tool in the MCP registry |
-| `test_seal.py` | `build_mime` deterministic; the bytes passed to `send_raw` hash to `message_sha256`; adding a Cc/Bcc after sealing → FAILED |
-| `test_verification_pending.py` | `timeout_after_send` → VERIFICATION_PENDING → VERIFIED, outbox count == 1; `timeout_before_send` → … → UNVERIFIED, outbox 0, never resent; `reject` → FAILED; `lag 3` → VERIFIED after retries; only VERIFIED counted as success in receipts and the harness |
-| `test_lock.py` | Tamper file after approval → FAILED; tamper payload field → FAILED |
-| `test_verifier.py` | FakeMail match → VERIFIED; recipient/attachment/subject mismatch → FAILED |
-| `test_fail_closed.py` | Resolver raises → BLOCKED, nothing in the outbox |
-| `test_ledger_privacy.py` | After the full demo flow, no ledger line contains any seed address, body substring or file bytes |
-| `test_receipts.py` | Cap-table question answered with the correct counts |
-| `test_guarantees.py` | Fixture-enumerated: no value from `fixtures/sensitive_values.json` in any Shielded tool result across the investor follow-up workflow and every tool × purpose; no `@`, no file contents; no tool named `send_email` in the MCP registry |
-| `test_followups_workflow.py` | "Handle my investor follow-ups" scripted end to end on FakeMail: unrelated sensitive items withheld (counts match), SENDER_3 data-room proposal BLOCKED, Priya VERIFIED, Karan downgraded to teaser. This is the sandbox fallback for the stage demo |
-| `test_harness_scoring.py` | Scorers on hand-built sandbox states (no API calls) |
+| File | Covers | Invariant |
+|---|---|---|
+| `test_detectors.py` | Each detector: ≥2 positive, ≥2 negative (bad Verhoeff, bad Luhn, wrong PAN 4th char, UPI vs email) | I2 |
+| `test_cleaner.py` | Each hidden rule; zero-width; padding; instruction patterns; trusted vs untrusted; newsletter preheader not quarantined; A1, A2, A3 quarantined | I2 |
+| `test_handles.py` | Stable within a session, different across sessions; unknown → SENDER; no `@` or path in any attr | I1 |
+| `test_broker.py` | Per purpose: released/withheld ids; demo task measured (target ≤4 released, 0 sensitive fixture values); `shareable=false` files never listed | I1 |
+| `test_guard_checks.py` | WHO (A4, raw address A5, unknown handle); WHAT (Priya → v3, Karan → teaser, v2 → v3 warn); POLICY (secrets, hr never); CONTENT (URL, image, handle, PAN, length) | I4, I5 |
+| `test_state_machine.py` | Every legal transition; every illegal one raises; double approve sends once; reject after approve is a no-op | I7 |
+| `test_approval_auth.py` | No cookie → 401; wrong seal → 409 and state unchanged; no approve tool in the MCP registry | I3, I6 |
+| `test_seal.py` | `build_mime` deterministic; the bytes passed to `send_raw` hash to `message_sha256`; adding a Cc/Bcc after sealing → FAILED | I6 |
+| `test_verification_pending.py` | `timeout_after_send` → VERIFICATION_PENDING → VERIFIED, outbox count == 1; `timeout_before_send` → … → UNVERIFIED, outbox 0, never resent; `reject` → FAILED; `lag 3` → VERIFIED after retries; only VERIFIED counted as success in receipts and the harness | I7 |
+| `test_lock.py` | Tamper file after approval → FAILED; tamper payload field → FAILED | I6 |
+| `test_verifier.py` | FakeMail match → VERIFIED; recipient/attachment/subject mismatch → FAILED | I7 |
+| `test_fail_closed.py` | Resolver raises → BLOCKED, nothing in the outbox | I9 |
+| `test_ledger_privacy.py` | After the full demo flow, no ledger line contains any seed address, body substring or file bytes | I8 |
+| `test_receipts.py` | Cap-table question answered with the correct counts | I8 |
+| `test_guarantees.py` | Fixture-enumerated: no value from `fixtures/sensitive_values.json` in any Shielded tool result across the investor follow-up workflow and every tool × purpose; no `@`, no file contents; no tool named `send_email` in the MCP registry | I1, I3 |
+| `test_followups_workflow.py` | "Handle my investor follow-ups" scripted end to end on FakeMail: unrelated sensitive items withheld (counts match), SENDER_3 data-room proposal BLOCKED, Priya VERIFIED, Karan downgraded to teaser. This is the sandbox fallback for the stage demo | I1, I4, I6, I7 (demo path) |
+| `test_harness_scoring.py` | Scorers on hand-built sandbox states (no API calls) | measurement |
+
+External clients have in-memory fakes with error injection (`FakeMail` with `fail_mode`; a canned-response fake for the harness agent), so every test runs offline and deterministically. The one live Gmail send is checked manually on stage and in rehearsal.
 
 `pytest` must be green before the 5× demo rehearsal.
 
@@ -805,3 +816,68 @@ class ActionSpec(Protocol):             # send_document, reply, event today; pay
 | 8 | `propose_event`, `propose_reply`, harness 3× runs | If time allows |
 
 If time runs short, cut from the bottom. The live Gmail send stays in scope; FakeMail is the rehearsed fallback, not a substitute.
+
+## 17. End-to-end walkthroughs
+
+### 17.1 "Handle my investor follow-ups" (the demo)
+
+```
+1.  User → assistant: "Handle my investor follow-ups."
+2.  Assistant → search(purpose="share_document", query="investor")
+3.  [broker] for each item: clean → label → purpose rule
+      e1 Priya: document_request, projections, due Fri          → released
+      e2 Karan: document_request, projections                   → released
+      e9 stranger: document_request, data_room                  → released (sender = SENDER_3)
+      e10 hidden instructions                                   → quarantined (SENDER_4)
+      e3 term sheet, e4 layoff, e5 GST/PAN, e6 medical, …       → withheld, counted by label
+    → ReleasedItems (handles + template summaries) + withheld counts; ledger("release")
+4.  Assistant → list_files(category="projections") → FILE_1 (v2), FILE_2 (v3, latest), requires_nda
+5.  Assistant → propose_send_document("CONTACT_1", "FILE_2", "Ahead of Friday")
+      gate ✔ · WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY financial + NDA ✔ · CONTENT ✔
+      read file once → build MIME (fixed Message-ID, boundary, date) → seal → AWAITING_APPROVAL
+6.  Assistant → propose_send_document("SENDER_3", "FILE_2")
+      WHO ✘ unknown recipient → BLOCKED (no seal, nothing queued)
+7.  Assistant → propose_send_document("CONTACT_4", "FILE_2")  (Karan, no NDA)
+      WHAT ⚠ downgraded to Teaser Deck → AWAITING_APPROVAL (shown if time allows)
+8.  User (logged in) → POST /api/actions/{id}/approve {seal}
+      seal == payload_hash ✔ → APPROVED → read file once → hashes ✔ → EXECUTING
+      send_attempted = true → GmailMail.send_raw(exact bytes)
+9.  [verifier] find_sent(Message-ID) → recipients ✔ subject ✔ attachment sha ✔ → VERIFIED
+10. Assistant → action_status(id) → "Sent and verified: Priya Rao received Projections v3 (fingerprint matched)."
+11. User → receipts "Did any AI see my cap table today?"
+      → "Shield released the cap table 0 times and withheld it twice today."
+```
+
+### 17.2 Uncertain delivery
+
+```
+1. Steps 1–8 as above; provider call raises TimeoutError after the message was accepted
+2. EXECUTING → VERIFICATION_PENDING ("may have been sent; checking, will not resend")
+3. schedule_verify: find_sent(Message-ID) at 1, 2, 4 … s
+4. Found and matching → VERIFIED. Still missing after ~2 min → UNVERIFIED. send_raw is never called again
+```
+
+### 17.3 Tamper after approval
+
+```
+1. Action AWAITING_APPROVAL with seal S (attachment sha A)
+2. POST /dev/tamper/proj_v3 changes the runtime file
+3. Approve(S) → read file once → sha ≠ A → FAILED "changed after approval: attachment"; nothing sent
+```
+
+## 18. Key implementation decisions
+
+| Decision | Rationale |
+|---|---|
+| **Template summaries instead of masked source text** | Makes I1 provable: a fixed template over structured fields can be tested against every fixture value; masking free text can't be shown complete |
+| **Names released, addresses never** | The user says "Priya"; the model must match a person. An address is the capability to send, so it stays server-side (I4) |
+| **Unknown senders' requests are visible as `SENDER_n`** | The assistant can propose; Shield shows the block. Hiding them would hide the protection from the user |
+| **Seal = hash of exact MIME bytes + full recipient list + attachment hash** | The approval means exactly what the user saw; any change, including an added Bcc, fails (I6) |
+| **Fixed Message-ID, date and boundary at proposal** | Deterministic bytes for the seal, and a stable key to find the sent message even if the send response is lost (I7) |
+| **`send_attempted` set before the provider call** | Guarantees at-most-once sending under timeouts and retries (I7) |
+| **UNVERIFIED as a terminal state** | After the retry window, "may have been sent" is the honest state; FAILED would claim it definitely wasn't |
+| **No approve tool on MCP; owner cookie + seal on REST** | Approval can't be reached by the model or by a prompt (I3, I6) |
+| **No LLM inside Shield** | Determinism, speed, and no "AI guarding AI" (HLD D4) |
+| **In-memory stores + JSON seed** | Hackathon scope; all state is reproducible with `/dev/reset` |
+| **Runtime copy of files** | Tamper demo never touches committed files |
+| **One shared `tools.py` for MCP and the harness** | The comparison measures the exact surface Claude uses on stage |

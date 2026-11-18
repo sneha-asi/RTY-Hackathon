@@ -1,13 +1,67 @@
 # Shield — PRD
 
 **The user-side trust layer for personal AI assistants: a shield around everything an assistant can reach.**
-Buildathon, Wed 18 Nov 2026, 3–7 PM IST · Track `ai-agents` · Feature freeze 5:30 PM · Code freeze 7:00 PM
 
 > **The AI proposes. The code decides. Nothing is done until it's proven.**
 
+| Field | Detail |
+|---|---|
+| Team | Axon |
+| Product | Shield |
+| Status | M0 (hackathon build) |
+| Event | Buildathon, Wed 18 Nov 2026, 3–7 PM IST · Track `ai-agents` · Code freeze 7:00 PM |
+| Related docs | [HLD](HLD.md) (components, boundaries, flows) · [LLD](LLD.md) (modules, algorithms, tests) · [One-pager](ONE_PAGER.md) |
+
 Confidence labels for external facts: **[V]** checked against the primary source · **[L]** secondary source, likely true · **[U]** unverified, don't cite on stage.
 
-The full product is described in §1–§9. What we build in four hours is in **§10 Hackathon scope**.
+The full product is described in §1–§9. What we build in four hours is in **§10 Hackathon scope**. All three documents share the IDs below: business principles **B1–B6** and invariants **I1–I10**.
+
+---
+
+## First principles
+
+### Business: why this product should exist
+
+| # | Principle | So Shield must… |
+|---|---|---|
+| B1 | **The value of an assistant grows with what it can reach, and so does the damage it can do.** People either grant everything and carry the risk, or grant little and get little | Make *more* delegation safe, not less. Success is tasks delegated safely, not attacks blocked |
+| B2 | **The user bears the loss; the assistant vendor marks its own homework.** A vendor's controls protect its product and are audited by the vendor | Be owned by the user and sit outside any one vendor |
+| B3 | **People use several assistants and switch between them.** Rules tied to one assistant are rewritten for each | Apply one policy across every supported assistant |
+| B4 | **Trust comes from evidence, not promises.** "We ask before sending" can't be checked by the user | Show what was released, withheld, approved and verified, from records |
+| B5 | **Friction kills delegation.** If every step needs a click, people turn the safety off | Gate only outward and irreversible actions; let proven narrow actions earn autonomy later |
+| B6 | **Start where sensitivity × adoption is highest.** Founders hold third-party data (investors, employees, cap tables) and adopt assistants early; investor follow-ups are frequent, valuable and risky | Win the founder wedge with one concrete job first: "Handle my investor follow-ups" |
+
+### Technical: what must be true for B1–B6 to hold
+
+The root cause is the lethal trifecta: **private data + untrusted content + a way to act outward** (§1). A model can't be made to reliably refuse instructions it reads, so the defence must not depend on the model. Shield removes or controls each leg in code:
+
+| # | Invariant | Removes / controls |
+|---|---|---|
+| I1 | **Need-to-know at the interface.** The model receives only handles, structured attributes and purpose-filtered summaries that Shield writes. No source text passes through | Private data |
+| I2 | **Untrusted content is data, never instructions.** Hidden text is stripped; instruction-like content is quarantined (a safeguard on top of I1, not the guarantee) | Untrusted content |
+| I3 | **No ambient authority.** The model has no tool that acts; it can only propose | Outward action |
+| I4 | **Code chooses targets and objects** from the user's own records (contacts, file catalogue). Raw addresses are refused | Outward action |
+| I5 | **Model-written text carries no outbound channel**: no URLs, images, raw identifiers or sensitive values | Outward action (exfil via content) |
+| I6 | **The user approves the exact sealed payload**: recipients, message bytes, attachment hash. Shield sends the same bytes it checked | Outward action |
+| I7 | **Done is a provider fact.** Only VERIFIED counts; uncertain delivery shows VERIFICATION_PENDING and is never resent automatically | False success |
+| I8 | **Every decision is recorded without content**, so receipts answer from evidence | Unauditable delegation (B4) |
+| I9 | **Fail closed.** Any error in resolve, check or summarise blocks or withholds | All |
+| I10 | **Claims follow the access path.** Full guarantees only where Shield is the only route; weaker, named claims elsewhere (§4, §6) | Over-claiming |
+
+### Traceability
+
+| Invariant | PRD requirements | Design (HLD / LLD) | Test (LLD §15) |
+|---|---|---|---|
+| I1 | F5, F6, F7 | HLD D1 · LLD §4, §4.4, §4.5 | `test_guarantees`, `test_broker`, `test_handles` |
+| I2 | F2, F3, F4 | LLD §4.1, §4.2 | `test_cleaner`, `test_detectors` |
+| I3 | F8, F18 | HLD D2 · LLD §9 | `test_guarantees` (no `send_email`, no approve tool) |
+| I4 | F8, F9, F10, F11 | HLD D3 · LLD §5.2 | `test_guard_checks` |
+| I5 | F12 | LLD §5.2 (CONTENT) | `test_guard_checks` |
+| I6 | F13, F14, F15 | HLD D5 · LLD §5.3, §5.4 | `test_seal`, `test_lock`, `test_approval_auth` |
+| I7 | F16 | HLD D6 · LLD §5.4, §6, §7 | `test_verifier`, `test_verification_pending` |
+| I8 | F17 | HLD D8 · LLD §8 | `test_receipts`, `test_ledger_privacy` |
+| I9 | all checks | HLD D7 · LLD §1, §5.1 | `test_fail_closed` |
+| I10 | §4.1, §6 | HLD D9, §5 | Dashboard "sole path" indicator (M1); stated on stage in M0 |
 
 ---
 
@@ -78,7 +132,7 @@ Not every assistant lets a third party sit in its path. Shield uses the stronges
 
 | Mode | When | How | Strength |
 |---|---|---|---|
-| **1. Enforce** (in the path) | Assistants that accept connectors/tools: Claude, ChatGPT dev mode, Cursor, custom agents (MCP) | The assistant connects to Shield instead of the account. All reads masked, all actions proposed | Full guarantees (§6) |
+| **1. Enforce** (in the path) | Assistants that accept connectors/tools: Claude, ChatGPT dev mode, Cursor, custom agents (MCP) | The assistant connects to Shield instead of the account. All reads returned as handles + summaries, all actions proposed | Full guarantees (§6) |
 | **2. Enforce at the edge** | Assistants that run on the user's machine or in their browser | Local proxy / OS-level network filter / browser extension that sees outbound requests: block unknown destinations, URL-borne exfil, unapproved sends | Strong for egress; partial for reads |
 | **3. Contain** (shrink what's reachable) | Closed assistants holding their own logins (Instinct, Muse, Dots), where a supported mirror exists | Give the assistant a **Shield-managed mirror** instead of the real account: a filtered inbox, a calendar showing free/busy only, a Drive folder with only shareable files, a virtual card with a spend limit. Outward actions from the mirror go back through Shield | Data minimisation is structural; actions are gated where the mirror is the only path |
 | **4. Watch and verify** (everywhere) | Any account, even ones the assistant reaches directly, limited to what the provider exposes | Read the account's own records (sent folder, OAuth grants, login/security events, bank transactions, file-sharing changes) and compare with what the user approved. Alert on anything unapproved; one-click revoke of the assistant's token | Detects and limits damage; can't prevent |
@@ -110,10 +164,10 @@ The honest claim: **full guarantees in mode 1; strong containment in modes 2–3
 
 | Area | Read through Shield | Actions through Shield |
 |---|---|---|
-| Email | Masked threads, handles for people and attachments | Send, reply, forward, share attachment, delete |
-| Calendar | Free/busy, masked events | Create, accept, invite |
+| Email | Thread summaries, handles for people and attachments | Send, reply, forward, share attachment, delete |
+| Calendar | Free/busy first; event summaries by purpose | Create, accept, invite |
 | Files / Drive / Docs | File catalogue as handles; contents only by purpose | Share, link, delete, change permissions |
-| Messaging (Slack, WhatsApp, SMS) | Masked messages | Post, DM |
+| Messaging (Slack, WhatsApp, SMS) | Message summaries | Post, DM |
 | Contacts / CRM | Attributes (role, org, NDA), not raw details | Add, update |
 | Browser / web | Cleaned pages; hidden text stripped | Fetches to allow-listed domains only; form submits proposed |
 | Money (bank, cards, shopping) | Balances as ranges, merchants as handles | Pay, buy (virtual card, limits, approval) |
@@ -218,7 +272,7 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
                  ▼
 ┌───────────────────────────── SHIELD ───────────────────────────────┐
 │ READ   source → cleaner → labeller → purpose rules → handles       │
-│        → masked view + exposure count                              │
+│        → handles + template summaries + exposure count             │
 │ WRITE  propose_* → WHO · WHAT · POLICY · CONTENT · LOCK            │
 │        → approval → executor → verifier                            │
 │ LEDGER append-only events → SSE → dashboard · receipts             │
@@ -235,7 +289,7 @@ Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness on
 | `cleaner.py` | Strip hidden text (display:none, white-on-white, tiny fonts, zero-width chars, whitespace padding); detect + quarantine instruction-like content |
 | `labels.py` | Sensitivity classes `financial · legal · hr · health · identity_ids · secrets · deal`; detectors: PAN, Aadhaar (Verhoeff), GSTIN, IFSC, UPI, card (Luhn), API keys, emails, phones, money |
 | `handles.py` | Per-session `CONTACT_n / SENDER_n / FILE_n / THREAD_n` with attributes; mapping never leaves the server |
-| `broker.py` | Purpose rules (`schedule`, `share_document`, `reply`, `triage`), masked views, exposure accounting |
+| `broker.py` | Purpose rules (`schedule`, `share_document`, `reply`, `triage`), template summaries, exposure accounting |
 | `guard.py` | Proposals, checks, payload seal, approval state machine |
 | `executor.py` | Sandbox mailbox + Gmail send; code picks the attachment bytes |
 | `verifier.py` | Re-read sent message; compare recipients, subject, attachment name + SHA-256 |
@@ -357,7 +411,7 @@ All P0 unless marked.
 | F19 | Harness: Direct vs Shielded, 3 runs each | Dashboard shows measured utility / attack success / exposure |
 | F20 | Dashboard: Direct vs Shielded panels, action cards with check rows, timeline, counters | Readable from the back of the room |
 | F21 | *P2:* Earned autonomy | — |
-| F22 | *P2:* Approve by phone (voice + PIN) | — |
+| F22 | *P2:* Approve from phone (push notification) | — |
 | F23 | *P2:* Real Gmail as read source | — |
 
 ### 10.7 Non-functional
