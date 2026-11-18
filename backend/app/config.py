@@ -36,15 +36,23 @@ class Settings:
     runtime_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_RUNTIME_DIR", str(BACKEND_DIR / "runtime"))))
     mail_backend: str = field(default_factory=lambda: _env("SHIELD_MAIL", "fake"))
     gmail_token: Path = field(default_factory=lambda: Path(_env("GMAIL_TOKEN", str(BACKEND_DIR / "token.json"))))
-    user_secret: str = field(default_factory=lambda: _env("SHIELD_USER_SECRET", "change-me"))
+    user_secret: str | None = field(default_factory=lambda: _env("SHIELD_USER_SECRET"))  # required; no default
     founder_name: str = field(default_factory=lambda: _env("FOUNDER_NAME", "Sneha"))
     harness_model: str = field(default_factory=lambda: _env("SHIELD_HARNESS_MODEL", "claude-sonnet-5-5"))
     demo_today: str | None = field(default_factory=lambda: _env("SHIELD_TODAY", "2026-11-18"))
     review_base: str = field(default_factory=lambda: _env("SHIELD_REVIEW_BASE", "http://127.0.0.1:8000"))
     watch: str = field(default_factory=lambda: _env("SHIELD_WATCH", "fake"))  # off | fake | gmail
     watch_token: Path = field(default_factory=lambda: Path(_env("WATCH_GMAIL_TOKEN", str(BACKEND_DIR / "token_watch.json"))))
-    enable_dev: bool = field(default_factory=lambda: _env("SHIELD_ENABLE_DEV", "1") == "1")
+    enable_dev: bool = field(default_factory=lambda: _env("SHIELD_ENABLE_DEV", "0") == "1")  # off unless asked
     verify_backoff: tuple[float, ...] = (1, 2, 4, 8, 15, 30, 60)
+
+    def secret_problem(self) -> str | None:
+        s = self.user_secret or ""
+        if not s:
+            return "SHIELD_USER_SECRET is not set"
+        if s in ("change-me", "demo", "password", "secret") or len(s) < 12:
+            return "SHIELD_USER_SECRET is too weak (use 12+ characters)"
+        return None
 
     def today(self) -> date:
         if self.demo_today:

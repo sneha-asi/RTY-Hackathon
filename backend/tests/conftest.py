@@ -10,7 +10,7 @@ TEST_ENV = {
     "FOUNDER_TEST_GMAIL": "founder@test.dev", "INVESTOR_TEST_GMAIL": "priya@northbeam.vc",
     "SECOND_TEST_EMAIL": "riya@acme.test", "THIRD_TEST_EMAIL": "ramesh@kirana.test",
     "FOURTH_TEST_EMAIL": "karan@angel.test", "COFOUNDER_TEST_EMAIL": "ananya@ownco.test",
-    "ACCOUNTANT_TEST_EMAIL": "vikram@joshi.test", "SHIELD_MAIL": "fake", "SHIELD_USER_SECRET": "test-secret",
+    "ACCOUNTANT_TEST_EMAIL": "vikram@joshi.test", "SHIELD_MAIL": "fake", "SHIELD_USER_SECRET": "test-secret-0123456789", "SHIELD_ENABLE_DEV": "1",
 }
 os.environ.update(TEST_ENV)
 

@@ -52,6 +52,8 @@ def _action_full(a) -> dict:
 @app.post("/api/login")
 async def login(req: Request, resp: Response):
     body = await req.json()
+    if not shield.settings.user_secret:
+        raise HTTPException(503, "owner secret not configured (set SHIELD_USER_SECRET)")
     if not hmac.compare_digest(str(body.get("secret", "")), shield.settings.user_secret):
         raise HTTPException(401, "wrong secret")
     tok = secrets.token_urlsafe(24)
@@ -207,7 +209,8 @@ def _dev(req: Request, token: str | None):
     if not shield.settings.enable_dev:
         raise HTTPException(404)
     header = req.headers.get("x-shield-secret", "")
-    if not (_user(token) or (header and hmac.compare_digest(header, shield.settings.user_secret))):
+    secret = shield.settings.user_secret or ""
+    if not (_user(token) or (header and secret and hmac.compare_digest(header, secret))):
         raise HTTPException(401, "login required")
 
 

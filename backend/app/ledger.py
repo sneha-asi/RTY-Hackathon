@@ -26,9 +26,9 @@ class Ledger:
             ev = {"seq": len(self._events), "ts": now_iso(), "kind": kind, **fields}
             self._events.append(ev)
             if self.path:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a") as f:
-                    f.write(json.dumps(ev) + "\n")
+                from .journal import secure_append, secure_dir
+                secure_dir(self.path.parent)
+                secure_append(self.path, json.dumps(ev))
             return ev
 
     def since(self, seq: int) -> list[dict[str, Any]]:

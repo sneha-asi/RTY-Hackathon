@@ -130,6 +130,7 @@ class Payload(BaseModel):
     date: str
     boundary: str
     message_sha256: str = ""
+    body_sha256: str = ""  # normalised body hash: lets the journal drop the body and still verify after a restart
 
 
 class Action(BaseModel):

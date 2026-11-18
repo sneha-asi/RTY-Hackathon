@@ -9,6 +9,22 @@ import uvicorn
 from app.main import app, mcp_app
 
 
+def preflight():
+    from app.main import shield
+    problem = shield.settings.secret_problem()
+    if problem and os.getenv("SHIELD_ALLOW_WEAK_SECRET") != "1":
+        raise SystemExit(f"Refusing to start: {problem}. Set it in backend/.env.")
+    if os.getenv("SHIELD_MCP_HOST", "127.0.0.1") not in ("127.0.0.1", "localhost"):
+        print("note: MCP listener is not on localhost. Tunnel/expose ONLY the MCP port, never the owner port.")
+    print(f"Shield · mail: {shield.settings.mail_backend} · watch: {shield.settings.watch} · dev endpoints: "
+          f"{'ON' if shield.settings.enable_dev else 'off'}")
+    if shield.settings.mail_backend == "gmail":
+        try:
+            print(f"Shield sends as: {shield.mail.whoami()}  (approved sends come from this account)")
+        except Exception as e:
+            print(f"warning: could not read the sender account: {type(e).__name__}: {e}")
+
+
 async def main():
     owner = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=int(os.getenv("SHIELD_OWNER_PORT", "8000")), log_level="info"))
     mcp_srv = uvicorn.Server(uvicorn.Config(mcp_app, host=os.getenv("SHIELD_MCP_HOST", "127.0.0.1"),
@@ -18,4 +34,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    preflight()
     asyncio.run(main())

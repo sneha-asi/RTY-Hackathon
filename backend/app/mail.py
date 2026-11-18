@@ -88,6 +88,10 @@ class GmailMail:
         creds = Credentials.from_authorized_user_file(str(token_path))
         self.svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
+    def whoami(self) -> str:
+        """The Gmail account approved sends will come from (needs gmail.readonly)."""
+        return self.svc.users().getProfile(userId="me").execute()["emailAddress"]
+
     def send_raw(self, raw: bytes, envelope: list[str], bcc: list[str] | None = None) -> str | None:
         from googleapiclient.errors import HttpError
         try:

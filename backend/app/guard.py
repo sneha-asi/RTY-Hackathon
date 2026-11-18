@@ -235,6 +235,7 @@ class Guard:
         data = self.seed.read_file_once(frec) if frec else None
         p.attachment_sha256 = sha256_bytes(data) if data is not None else None
         p.message_sha256 = sha256_bytes(build_mime(p, data))
+        p.body_sha256 = hashlib.sha256(_norm_body(p.body).encode()).hexdigest()
         if p.cc or p.bcc or len(p.to) != 1:  # M0 contract: exactly one To recipient
             lock.status, lock.detail = "fail", "M0 supports exactly one To recipient"
             return self._to(a, State.BLOCKED, "LOCK: M0 supports exactly one To recipient")
@@ -315,37 +316,46 @@ class Guard:
             a.approved_by = user
             self._to(a, State.APPROVED)
             p = a.payload
-            frec = self.seed.file(p.file_id) if p.file_id else None
-            data = self.seed.read_file_once(frec) if frec else None  # read ONCE; these bytes are checked and sent
-            if (sha256_bytes(data) if data is not None else None) != p.attachment_sha256:
-                return self._to(a, State.FAILED, "changed after approval: attachment")
-            raw = build_mime(p, data)
-            if sha256_bytes(raw) != p.message_sha256 or seal(p) != a.payload_hash:
-                return self._to(a, State.FAILED, "changed after approval: message")
-            if self.journal and self.journal.attempted(a.id):  # survived a restart: verify only, never resend
-                self._to(a, State.EXECUTING)
-                a.send_attempted = True
-                self._to(a, State.VERIFICATION_PENDING, "send already attempted before restart")
-                self._scheduler(lambda: self._verify_loop(a.id))
-                return a
-            self._to(a, State.EXECUTING)
-            a.send_attempted = True  # before the provider call: at most once (I7)
-            if self.journal:
-                self.journal.attempt(a.model_dump(mode="json"))  # durable marker, fsynced before sending
+            # --- everything before the provider call: any failure means definitely not sent → FAILED
+            try:
+                frec = self.seed.file(p.file_id) if p.file_id else None
+                data = self.seed.read_file_once(frec) if frec else None  # read ONCE; these bytes are checked and sent
+                if (sha256_bytes(data) if data is not None else None) != p.attachment_sha256:
+                    return self._to(a, State.FAILED, "changed after approval: attachment")
+                raw = build_mime(p, data)
+                if sha256_bytes(raw) != p.message_sha256 or seal(p) != a.payload_hash:
+                    return self._to(a, State.FAILED, "changed after approval: message")
+                if self.journal and self.journal.attempted(a.id):  # survived a restart: verify only, never resend
+                    self._to(a, State.EXECUTING)
+                    a.send_attempted = True
+                    self._to(a, State.VERIFICATION_PENDING, "send already attempted before restart")
+                    self._scheduler(lambda: self._verify_loop(a.id))
+                    return a
+                self._to(a, State.EXECUTING, f"sending via {self.sent_label.split()[0]}")
+                if self.journal:
+                    self.journal.attempt(a)  # durable marker, fsynced BEFORE the provider call
+            except Exception as e:
+                return self._to(a, State.FAILED, f"not sent: {type(e).__name__} before the provider call")
+            a.send_attempted = True  # from here on: at most once (I7)
             try:
                 a.sent_message_id = self.mail.send_raw(raw, envelope=p.to + p.cc + p.bcc, bcc=p.bcc)
             except DefinitelyNotSent as e:
-                return self._to(a, State.FAILED, f"not sent: {e.code}")
-            except Exception as e:
-                self._to(a, State.VERIFICATION_PENDING, f"provider: {type(e).__name__}")
+                return self._to(a, State.FAILED, f"not sent: provider rejected ({e.code})")
+            except Exception as e:  # timeout / 5xx / reset: it may have gone out
+                self._to(a, State.VERIFICATION_PENDING, f"provider: {type(e).__name__}; checking {self.sent_label}")
                 self._scheduler(lambda: self._verify_loop(a.id))
                 return a
-            verdict = self.verify_once(a)
+            # --- after the provider accepted it: read-back errors never resend, they only retry the read
+            try:
+                verdict = self.verify_once(a)
+            except Exception as e:
+                verdict = "error"
+                a.reason = f"read-back error: {type(e).__name__}"
             if verdict == "ok":
                 return self._to(a, State.VERIFIED, f"found in {self.sent_label}; recipient, subject, body and attachment match")
             if verdict == "mismatch":
                 return self._to(a, State.UNVERIFIED, f"sent record differs from approval: {self._first_mismatch(a)}")
-            self._to(a, State.VERIFICATION_PENDING, "sent; read-back not visible yet")
+            self._to(a, State.VERIFICATION_PENDING, f"sent; checking {self.sent_label}")
             self._scheduler(lambda: self._verify_loop(a.id))
             return a
 
@@ -360,7 +370,7 @@ class Guard:
         checks = {
             "recipients": n(s.to + s.cc + s.bcc) == n(p.to + p.cc + p.bcc),
             "subject": s.subject == p.subject,
-            "body": _norm_body(s.body) == _norm_body(p.body),
+            "body": hashlib.sha256(_norm_body(s.body).encode()).hexdigest() == p.body_sha256,
             "attachment": s.attachments == ([(p.file_name, p.attachment_sha256)] if p.file_id else []),
         }
         a.verification = checks
@@ -379,7 +389,10 @@ class Guard:
             with self._lock(aid):
                 if a.state != State.VERIFICATION_PENDING:
                     return
-                v = self.verify_once(a)  # read only — never send_raw here
+                try:
+                    v = self.verify_once(a)  # read only — never send_raw here
+                except Exception:
+                    continue  # transient read-back error: retry the read, never the send
                 if v == "ok":
                     self._to(a, State.VERIFIED, f"found in {self.sent_label}; matches approval")
                     return
