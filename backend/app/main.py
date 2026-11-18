@@ -86,9 +86,26 @@ def state(shield_owner: str | None = Cookie(default=None)):
         # checked from here (a missing visible grant doesn't prove it), so it is reported as unknown.
         "sole_path": "yes (sandbox mailbox)" if shield.settings.mail_backend == "fake" else "unknown",
         "policy": next((k for k, v in shield.policies.items() if v.get("enabled")), None),
+        "assistants": _assistants(),
         "harness": HARNESS,
         "sent_folder": _sent_folder(),
     }
+
+
+ROADMAP_ASSISTANTS = [
+    {"name": "Instinct", "mode": "mirror account + watch & revoke", "status": "roadmap, not tested"},
+    {"name": "Muse", "mode": "edge proxy + mirror + watch & revoke", "status": "roadmap, not tested"},
+    {"name": "OpenClaw", "mode": "MCP if its tools can point at Shield, else edge proxy", "status": "roadmap, not tested"},
+]
+
+
+def _assistants() -> list[dict]:
+    """Connected MCP assistants (enforced, same policy) plus the roadmap targets (I10: claims follow the path)."""
+    sole = "yes (sandbox mailbox)" if shield.settings.mail_backend == "fake" else "unknown"
+    live = [{"name": c["name"], "version": c.get("version", ""), "mode": "MCP connector", "status": "enforced",
+             "sole_path": sole, "calls": c["calls"], "last_seen": c.get("last_seen", "")}
+            for c in shield.clients.values()]
+    return live + ROADMAP_ASSISTANTS
 
 
 def _sent_folder() -> list[dict]:

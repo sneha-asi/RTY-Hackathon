@@ -45,13 +45,22 @@ Start a fresh assistant conversation, so its handles are new.
 | 5 | The assistant relays the status text word for word | — |
 | 6 | **Ask Shield:** "Did any AI see my cap table today?" | "Shield released the cap table 0 times and withheld it N times today." |
 
+| 7 | **Second assistant, same policy:** `cd backend && python scripts/second_assistant.py` (or connect Codex, below) | The **Assistants** strip shows two enforced assistants under one policy. The second one sees the same summaries and counts, and the same stranger request is 🛑 BLOCKED. Instinct, Muse and OpenClaw are shown as roadmap, not tested |
+
 Only Priya's card is approved on stage. Leave Karan's card awaiting approval (or reject it) so there's one approval.
 
 ## Optional extras (if time)
 
 - **Tamper.** After step 3, before approving, run `curl -X POST -H "X-Shield-Secret: $SHIELD_USER_SECRET" http://127.0.0.1:8000/dev/tamper/proj_v3` → approve → ❌ FAILED "changed after approval", nothing in Sent. Run the reset script afterwards.
 - **Timeout.** Before approving, run `curl -X POST -H "X-Shield-Secret: $SHIELD_USER_SECRET" -H "Content-Type: application/json" -d '{"mode":"timeout_after_send"}' http://127.0.0.1:8000/dev/mail_fault` → approve → ⏳ VERIFICATION PENDING → ✅ VERIFIED, one message in Sent.
-- **Second assistant.** Any MCP client can connect to the same `http://127.0.0.1:8765/mcp` under the same policy (B3).
+- **Codex as the second assistant.** If your Codex CLI supports HTTP MCP servers (check `codex mcp --help`), point it at `http://127.0.0.1:8765/mcp`, for example in `~/.codex/config.toml`:
+
+  ```toml
+  [mcp_servers.shield]
+  url = "http://127.0.0.1:8765/mcp"
+  ```
+
+  Then ask it the same request. Otherwise use `scripts/second_assistant.py`, a plain MCP client that names itself `second-assistant`.
 
 ## If something breaks
 

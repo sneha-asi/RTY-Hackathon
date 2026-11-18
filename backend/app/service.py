@@ -44,6 +44,7 @@ class Shield:
         self.sessions: dict[str, HandleRegistry] = {}
         self.guard.recover()
         self.model_view: list[dict] = []  # exactly what the model received, for the dashboard
+        self.clients: dict[str, dict] = {}  # MCP session id -> {name, version, calls, first_seen, last_seen}
 
     def registry(self, session_id: str) -> HandleRegistry:
         if session_id not in self.sessions:
@@ -51,3 +52,14 @@ class Shield:
             name, pol = next(((k, v) for k, v in self.policies.items() if v.get("enabled")), ("", {}))
             self.sessions[session_id] = HandleRegistry(self.seed, name, copy.deepcopy(pol))
         return self.sessions[session_id]
+
+    def note_client(self, session_id: str, name: str, version: str = "") -> None:
+        """Record which assistant client is behind an MCP session (from its MCP initialize clientInfo)."""
+        from .ledger import now_iso
+        c = self.clients.get(session_id)
+        if c is None:
+            c = self.clients[session_id] = {"name": name or "unknown MCP client", "version": version, "calls": 0,
+                                            "first_seen": now_iso()}
+            self.ledger.emit("assistant_connected", session_id=session_id, client=c["name"])
+        c["calls"] += 1
+        c["last_seen"] = now_iso()

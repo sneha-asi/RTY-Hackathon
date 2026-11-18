@@ -191,7 +191,7 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 ## 9. Implementation status
 
-All on `main`; 113 tests (`cd backend && python -m pytest -q`).
+All on `main`; 115 tests (`cd backend && python -m pytest -q`).
 
 | Slice (LLD §16) | Status |
 |---|---|
@@ -202,4 +202,5 @@ All on `main`; 113 tests (`cd backend && python -m pytest -q`).
 | 5. Ledger, receipts, SSE, owner console (policy and sole-path indicator, Sent folder) | **Done** |
 | 6. Direct-vs-Shielded comparison (scripted runner; model runner needs an API key) | **Done**: 21 planted values exposed without Shield, 0 with; task done in both |
 | 7. Calendar first cut (`free_slots`, free/busy only, policy-gated) | **Done** |
+| Assistants strip: connected MCP clients (by their MCP client name) shown as enforced under one policy; Instinct, Muse, OpenClaw shown as roadmap, not tested | **Done** |
 | Tools: `search`, `read`, `list_files`, `free_slots`, `propose_send_document`, `propose_reply`, `action_status` | **Done** |

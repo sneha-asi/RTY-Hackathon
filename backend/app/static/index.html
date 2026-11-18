@@ -29,6 +29,9 @@ input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-r
 .banner{background:#3a1416;border:1px solid var(--bad);color:#ffd5d5;border-radius:8px;padding:8px 10px;margin:6px 0}
 .withheld{color:var(--mute);font-size:14px}
 #login{max-width:380px;margin:60px auto}
+.assistants{display:flex;gap:10px;flex-wrap:wrap;padding:12px 20px 0}
+.asst{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px;background:var(--panel)}
+.asst b{font-size:15px}.asst.live{border-color:var(--ok)}.asst.road{opacity:.6;border-style:dashed}
 </style>
 </head>
 <body>
@@ -39,6 +42,7 @@ input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-r
   <input id="secret" type="password" placeholder="Shield secret"><br><br><button onclick="login()">Log in</button>
 </div>
 <div id="app" hidden>
+  <div class="assistants" id="assistants"></div>
   <div class="counters">
     <div class="counter"><b id="c-rel">0</b><span>threads + files released</span></div>
     <div class="counter"><b id="c-q">0</b><span>quarantine notices</span></div>
@@ -91,7 +95,7 @@ async function refresh(){
   $('login').hidden=true;$('app').hidden=false;$('backend').textContent=`policy: ${s.policy} · mail: ${s.mail_backend} · sole path: ${s.sole_path}`;
   $('c-sens').textContent=s.counters.sensitive_values_exposed;$('c-rel').textContent=s.counters.released;$('c-q').textContent=s.counters.quarantined;$('c-b').textContent=s.counters.blocked;$('c-v').textContent=s.counters.verified;
   $('actions').innerHTML=s.actions.length?s.actions.map(renderAction).join(''):'<p class="withheld">No proposals yet.</p>';
-  renderHarness(s.harness);$('sent').innerHTML=(s.sent_folder||[]).length?s.sent_folder.map(m=>`<div class="item"><b>To:</b> ${esc(m.to.join(', '))} · <b>${esc(m.subject)}</b><br><span class="mono">${m.attachments.map(a=>esc(a.name)+' sha256 '+esc(a.sha256)+'…').join(', ')} · ${esc(m.message_id)}</span></div>`).join(''):'<p class="withheld">Nothing sent.</p>';$('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
+  renderHarness(s.harness);$('assistants').innerHTML='<span class="withheld" style="align-self:center">ASSISTANTS · one policy</span>'+(s.assistants||[]).map(a=>a.status==='enforced'?`<div class="asst live"><b>${esc(a.name)}</b> <span class="pass">● enforced</span><br><span class="mono">${esc(a.mode)} · sole path: ${esc(a.sole_path)} · ${a.calls} calls</span></div>`:`<div class="asst road"><b>${esc(a.name)}</b> <span class="withheld">${esc(a.status)}</span><br><span class="mono">${esc(a.mode)}</span></div>`).join('');$('sent').innerHTML=(s.sent_folder||[]).length?s.sent_folder.map(m=>`<div class="item"><b>To:</b> ${esc(m.to.join(', '))} · <b>${esc(m.subject)}</b><br><span class="mono">${m.attachments.map(a=>esc(a.name)+' sha256 '+esc(a.sha256)+'…').join(', ')} · ${esc(m.message_id)}</span></div>`).join(''):'<p class="withheld">Nothing sent.</p>';$('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
 let es;function boot(){refresh();if(es)es.close();es=new EventSource('/api/events');
   es.addEventListener('ledger',e=>{const ev=JSON.parse(e.data);const line=document.createElement('div');
     line.textContent=`${ev.ts.slice(11,19)} ${ev.kind} ${ev.action_id||''} ${ev.to||ev.purpose||ev.tool||''} ${ev.reason||''}`;$('timeline').prepend(line);refresh()});

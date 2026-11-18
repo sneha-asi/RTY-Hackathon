@@ -139,3 +139,14 @@ def test_list_files_and_free_slots_follow_policy(shield):
     assert {f["category"] for f in files} <= {"projections", "teaser"}
     shield.registry("p2").policy["purposes"] = ["share_document"]
     assert "error" in tools.free_slots(shield, "p2", "2026-11-18", "2026-11-25")
+
+
+def test_assistants_list_shows_connected_client_and_roadmap(shield):
+    from fastapi.testclient import TestClient
+    from app import main
+    main.shield.note_client("mcp:abc", "claude-code", "2.1")
+    c = TestClient(main.app)
+    c.post("/api/login", json={"secret": main.shield.settings.user_secret})
+    names = {a["name"]: a for a in c.get("/api/state").json()["assistants"]}
+    assert names["claude-code"]["status"] == "enforced"
+    assert names["Instinct"]["status"].startswith("roadmap")

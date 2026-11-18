@@ -15,6 +15,9 @@ INSTRUCTIONS = (
 )
 
 
+_SHIELD: Shield | None = None
+
+
 def _sid(ctx: Context | None) -> str:
     """Handles and actions are bound to the client's MCP session. No shared default session."""
     try:
@@ -23,10 +26,20 @@ def _sid(ctx: Context | None) -> str:
         sid = None
     if not sid:
         raise ValueError("no MCP session; reconnect")
-    return "mcp:" + sid
+    sid = "mcp:" + sid
+    try:  # which assistant is this? (clientInfo from the MCP initialize handshake)
+        info = ctx.request_context.session.client_params.clientInfo
+        name, version = info.name, info.version
+    except Exception:
+        name, version = "unknown MCP client", ""
+    if _SHIELD is not None:
+        _SHIELD.note_client(sid, name, version)
+    return sid
 
 
 def build_mcp(shield: Shield) -> FastMCP:
+    global _SHIELD
+    _SHIELD = shield
     mcp = FastMCP("shield", instructions=INSTRUCTIONS, streamable_http_path="/mcp")
 
     @mcp.tool()

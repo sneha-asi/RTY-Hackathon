@@ -14,7 +14,7 @@ from typing import Callable
 
 from . import labels
 from .config import TZ
-from .handles import HandleRegistry
+from .handles import HANDLE_RX, HandleRegistry
 from .ledger import Ledger, now_iso
 from .mail import DefinitelyNotSent
 from .models import TERMINAL, TRANSITIONS, Action, IllegalTransition, Payload, State
@@ -402,7 +402,8 @@ class Guard:
         }[a.state]
 
     def view_for_model(self, a: Action) -> dict:
-        return {"action_id": a.id, "state": a.state.value, "status_text": self.status_text(a), "request": a.request_handle,
+        return {"action_id": a.id, "state": a.state.value, "status_text": self.status_text(a),
+                "request": a.request_handle if a.request_handle and HANDLE_RX.match(a.request_handle) else None,
                 "checks": [{"name": c.name, "status": c.status, "detail": c.detail} for c in a.checks],
                 "warnings": a.warnings}
 

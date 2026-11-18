@@ -107,3 +107,10 @@ def test_content_link_variants_all_blocked():
         assert content_problems(t, 1000), t
     for t in ["Will send the latest numbers before Friday.", "Projections v3 attached, thanks!"]:
         assert content_problems(t, 1000) == [], t
+
+
+def test_blocked_raw_address_is_not_echoed_back(shield):
+    _, files = _look(shield)
+    v3 = next(h for h, f in files.items() if f["category"] == "projections" and f["latest"])
+    view = tools.propose_send_document(shield, S, "growth@quickcap-partners.io", v3)
+    assert view["state"] == "BLOCKED" and "@" not in json.dumps(view)

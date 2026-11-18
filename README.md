@@ -134,11 +134,11 @@ See [RULES.md](RULES.md) for the full list.
   - A send-attempt marker is flushed to a local journal before the provider call. A timeout becomes `VERIFICATION_PENDING` and is only ever re-verified, never resent, even after a restart.
   - A Sent record that differs from the approval is `UNVERIFIED` with the differing field. `FAILED` is reserved for messages that definitely weren't sent.
   - The MCP listener is a separate app, so a tunnel to it can't reach approval or raw data.
-  - The demo validates the core enforcement path, and the 113-test suite checks the M0 invariants: the five checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value reaches the model.
+  - The demo validates the core enforcement path, and the 115-test suite checks the M0 invariants: the five checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value reaches the model.
 - **How to run it:**
   ```bash
   cd backend && pip install -r requirements.txt && cp .env.example .env   # set SHIELD_USER_SECRET
-  python -m pytest -q        # 113 tests
+  python -m pytest -q        # 115 tests
   python run.py              # owner console http://127.0.0.1:8000 · MCP http://127.0.0.1:8765/mcp
   claude mcp add --transport http shield http://127.0.0.1:8765/mcp   # then ask: "Handle my investor follow-ups"
   ```
