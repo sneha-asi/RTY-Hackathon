@@ -42,7 +42,7 @@ The PRD's first principles (PRD § "First principles") lead to these design prin
 
 ## 3. Component architecture
 
-**Shared policy.** The standing policy (`data/policy.json`, M0: `investor_followups`) is bound to each MCP session when it starts. It feeds both the broker (which purposes, roles and categories may be released) and the guard (which requests may be answered, with which file categories, to which roles). A proposal names a *request* handle; the guard checks the request was released in this session under this policy.
+**Shared policy.** The standing policy (`backend/config/policy.json`, M0: `investor_followups`) is bound to each MCP session when it starts. It feeds both the broker (which purposes, roles and categories may be released) and the guard (which requests may be answered, with which file categories, to which roles). A proposal names a *request* handle; the guard checks the request was released in this session under this policy.
 
 ```
             standing policy (founder enables once: investor_followups)

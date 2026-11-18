@@ -53,8 +53,8 @@ backend/
     journal.py       NEW   durable send-attempt journal (fsync before provider call)
     receipts.py      NEW   fixed-intent receipt queries from ledger counts
     static/index.html NEW  owner console page
-  run.py             NEW   starts both listeners in one process: owner :8000 (127.0.0.1), MCP :8765/mcp
-  data/policy.json   NEW   standing policies (M0: investor_followups)
+  app/__main__.py    NEW   `python -m app`: starts both listeners in one process: owner :8000 (127.0.0.1), MCP :8765/mcp
+  config/policy.json NEW   standing policies (M0: investor_followups)
   data/              contacts.json, files.json (extend) + emails.json, events.json (new)
   files/             demo files (PDF/TXT); copied to a runtime dir at startup
   tests/
@@ -63,7 +63,7 @@ app/static/          index.html (owner console) · review.html (approval page)
 
 ## 3. Data model
 
-### 3.1 Seed records (JSON in `backend/data/`)
+### 3.1 Seed records (synthetic, JSON in `demo/fixtures/`; the standing policy is `backend/config/policy.json`)
 
 **contacts.json** — add `trusted` (internal people whose content is never quarantined).
 
@@ -410,7 +410,7 @@ Session totals live on `ledger.sessions[session_id]`. Direct mode just measures.
 
 ### 5.0 Standing policy (shared by read and write paths)
 
-`data/policy.json`, enabled by the founder once:
+`backend/config/policy.json`, enabled by the founder once:
 
 ```json
 {"investor_followups": {"enabled": true, "purposes": ["share_document", "schedule"],

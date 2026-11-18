@@ -1,4 +1,6 @@
-# Demo runbook
+# Demo: runbook for rehearsal, recording and fallback
+
+This is the single runbook. Synthetic fixtures are in [`fixtures/`](fixtures/): contacts, inbox, calendar, sample files, published IDs and the planted sensitive values the tests check. Scripts are in [`scripts/`](scripts/). Run them from anywhere; tokens, `credentials.json` and `.env` live in `backend/`.
 
 **Primary live flow:** an executive asks Instinct over WhatsApp to prepare an investor follow-up. Instinct reads one labelled synthetic email in the executive's Gmail and replies with a request ID and a document ID. The executive pastes that reply into Shield, which resolves the real recipient and deck locally. The executive approves the exact email once, and Shield shows **Verified in Gmail Sent**.
 
@@ -13,7 +15,7 @@
 ## 0. One-time setup (your laptop)
 
 ```bash
-cd backend && pip install -r requirements.txt && cp .env.example .env
+cd backend && pip install -e ".[gmail,test]" && cp .env.live.example .env
 ```
 
 In `backend/.env`:
@@ -30,17 +32,17 @@ Put `credentials.json` in `backend/`: a Google Cloud OAuth client of type **Desk
 Sign in as **the Gmail account Instinct reads** when the browser opens:
 
 ```bash
-python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
+python demo/scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
 ```
 
 Preview first, then publish:
 
 ```bash
-python scripts/seed_demo_request.py --token token_watch.json --dry-run
+python demo/scripts/seed_demo_request.py --token token_watch.json --dry-run
 ```
 
 ```bash
-python scripts/seed_demo_request.py --token token_watch.json
+python demo/scripts/seed_demo_request.py --token token_watch.json
 ```
 
 This inserts **"[Shield Demo] Priya — investor follow-up"**, labelled `Shield demo`. It contains a safe summary, `REQ_7` and `FILE_2`, and no attachment or destination address. Shield records the publication with Gmail's message id as evidence.
@@ -50,14 +52,14 @@ This inserts **"[Shield Demo] Priya — investor follow-up"**, labelled `Shield 
 Shield sends only from the account in `GMAIL_TOKEN`. Use a separate test sender if you have one; otherwise your own account works, but say so on camera. Sign in as **the sender** when the browser opens:
 
 ```bash
-python scripts/gmail_token.py --out token.json --scopes send,readonly
+python demo/scripts/gmail_token.py --out token.json --scopes send,readonly
 ```
 
 ```bash
-python scripts/gmail_whoami.py --token token.json
+python demo/scripts/gmail_whoami.py --token token.json
 ```
 
-That prints the sender address. `python run.py` prints it again at startup ("Shield sends as: …").
+That prints the sender address. `python -m app` prints it again at startup ("Shield sends as: …").
 
 ## 3. Go/no-go: the WhatsApp handoff
 
@@ -69,10 +71,10 @@ Ask Instinct in WhatsApp:
 
 ## 4. Rehearse on FakeMail first
 
-Set `SHIELD_MAIL=fake` in `.env`, then:
+Set `SHIELD_MAIL=fake` in `.env`, then, from `backend/`:
 
 ```bash
-python run.py
+python -m app
 ```
 
 1. Open http://127.0.0.1:8000/intake and log in. You should see the connection label, "✔ Published to <your Gmail> · Gmail id …", and the exact seeded email.
@@ -93,10 +95,10 @@ python run.py
 Set `SHIELD_MAIL=gmail` in `.env`, then:
 
 ```bash
-python scripts/gmail_smoke.py --yes
+python demo/scripts/gmail_smoke.py --yes
 ```
 
-Expect `VERIFIED` ("Verified in Gmail Sent"), and the email in the recipient inbox. Then restart `python run.py` with `SHIELD_MAIL=gmail`.
+Expect `VERIFIED` ("Verified in Gmail Sent"), and the email in the recipient inbox. Then restart `python -m app` with `SHIELD_MAIL=gmail`.
 
 ## 6. Recording (WhatsApp on the left, Shield on the right)
 
@@ -117,7 +119,7 @@ Say: "The WhatsApp reply only had a file ID. Shield resolved it locally to the a
 claude mcp add --transport http shield http://127.0.0.1:8765/mcp
 ```
 
-Ask: "Handle my investor follow-ups." Proposals return a `review_url` to the same review page. `python scripts/second_assistant.py` shows a second MCP client under the same policy. OpenClaw: connect it to the same URL per https://docs.openclaw.ai/tools/mcp (untested). Only the MCP port may ever be tunnelled; never the owner port (8000).
+Ask: "Handle my investor follow-ups." Proposals return a `review_url` to the same review page. `python demo/scripts/second_assistant.py` shows a second MCP client under the same policy. OpenClaw: connect it to the same URL per https://docs.openclaw.ai/tools/mcp (untested). Only the MCP port may ever be tunnelled; never the owner port (8000).
 
 ## 8. Optional, off the critical path
 
@@ -128,7 +130,7 @@ Ask: "Handle my investor follow-ups." Proposals return a `review_url` to the sam
 ## 9. After recording
 
 ```bash
-python scripts/cleanup_demo_mail.py --token token_watch.json
+python demo/scripts/cleanup_demo_mail.py --token token_watch.json
 ```
 
 This moves everything labelled `Shield demo` to Trash and removes the label. Tokens and `.env` stay on your laptop; they're git-ignored.

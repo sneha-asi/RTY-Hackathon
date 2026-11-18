@@ -465,7 +465,7 @@ All P0 unless marked.
 - Anthropic API (`claude-sonnet-5-5`) for the harness agent only.
 - Gmail API (`gmail.send`, `gmail.readonly`) with a pre-generated `token.json`.
 - Official MCP Python SDK. On stage the MCP client runs on the same laptop (Claude Code), so nothing is tunnelled. If a remote client is used, only the MCP listener is exposed, never the owner console.
-- All demo data is synthetic. Existing seed in `backend/data/` is reused: Priya Rao (investor, NDA), Karan Mehta (investor, no NDA), Projections v2/v3, Teaser Deck.
+- All demo data is synthetic. Synthetic fixtures live in `demo/fixtures/`: Priya Rao (investor, NDA), Karan Mehta (investor, no NDA), Projections v2/v3, Teaser Deck.
 
 ### 10.9 Definition of done
 
