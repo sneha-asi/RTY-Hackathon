@@ -76,7 +76,14 @@ If you need a change in a file you don't own, write it down in your final note i
 | 6:30–6:50 | Rehearse the demo 5× (live Gmail, or the sandbox fallback); record the backup video |
 | 6:55 | Final push. Nothing after 7:00 |
 
-## Branches
+## Hand-off
 
-- Claude: `claude/focused-rubin-b43hc6`, merged into `main`.
-- Codex: its own branch, e.g. `codex/gmail-and-tests`. Before 6:30, run `git fetch origin main && git merge origin/main`, then push. Claude merges it into `main` (plain merge, no rebase or squash).
+Codex works in the user's local copy and does **not** use git. When a task is done, the user gives Claude the changed files. Claude puts them in the repo, runs `pytest`, commits and pushes to the branch and `main`.
+
+Hand-offs:
+
+| By (IST) | Files |
+|---|---|
+| ~6:05 | Task 1: test files and any fixes |
+| ~6:20 | Task 2: Gmail files |
+| ~6:25 | Task 3: demo runbook and reset script |
