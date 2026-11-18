@@ -102,7 +102,7 @@ class Watcher:
         else:
             severity = "medium" if reasons else "ok"
         if not approved:
-            reasons.insert(0, "not approved through Shield")
+            reasons.insert(0, "no matching Shield approval")
         return Alert(id=f"{o.kind}:{m.provider_id}", kind=o.kind, severity=severity, to=recips, subject=m.subject,
                      reasons=reasons, approved_by_shield=approved, draft_id=o.draft_id, seen_at=now_iso(),
                      attachments=att_names)

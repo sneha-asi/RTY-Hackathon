@@ -2,7 +2,7 @@
 
 **Claude builds the M0 layer; Codex reviews.** The one-pager, PRD, HLD and LLD are the source of truth. Rules from [AGENTS.md](../AGENTS.md) apply: small commits, push often, no force-push, no history rewrite, no secrets in git.
 
-## Built (on `main`, 126 tests)
+## Built (on `main`, 134 tests)
 
 Run `cd backend && python -m pytest -q`, then `python run.py`.
 
@@ -26,8 +26,21 @@ Run `cd backend && python -m pytest -q`, then `python run.py`.
 
 Send findings back to Claude; Claude fixes and pushes.
 
+## Live demo (primary) and fallbacks
+
+Primary: Instinct over WhatsApp reads one labelled synthetic email in the executive's Gmail (`scripts/seed_demo_request.py`). Its reply is pasted into `/intake`, then the review page, one approval, and Verified in Gmail Sent. Fallbacks: the same screens on FakeMail, or the MCP flow. Full runbook: [DEMO.md](DEMO.md).
+
+| Step | Who | Status |
+|---|---|---|
+| Send-state hardening, private journal, owner secret, dev endpoints off by default | Claude | Done, tested |
+| Read-only preview; publication recorded only with Gmail evidence; assistant reply recorded as a separate fact | Claude | Done, tested |
+| Intake and review screens for the recording | Claude | Done; rehearsed on FakeMail in a browser |
+| Google sign-in, seed the email, confirm the sender account | You | Pending |
+| Go/no-go: Instinct returns `REQ_7` / `FILE_2` over WhatsApp | You | Pending |
+| One real Gmail send to the test recipient (`gmail_smoke.py --yes`) | You | Pending |
+| Comparison is labelled **scripted** | — | Done |
+
 ## Remaining (Claude)
 
-1. Demo runbook (`docs/DEMO.md`) and reset script.
-2. Fixes from Codex's review.
-3. Rehearsal at 6:30–6:50; final push by 6:55.
+1. Fixes from Codex's review and from your first live run.
+2. Final push before 7:00.

@@ -83,7 +83,7 @@ The root cause is the lethal trifecta: **private data + untrusted content + a wa
 
 Many other assistants exist (ChatGPT, Claude, Gemini, Copilot, Dots); the same layer applies to them, and we use them as supporting evidence rather than the headline.
 
-**Watch on the executive's own Gmail (built):** for an assistant that keeps its direct Gmail connection, Shield reads Sent and Drafts, flags anything not approved through Shield with the reason, can remove a risky draft before it is sent, and links to revoke the assistant's access. Detection and draft removal only; no prevention on that path.
+**Watch on the executive's own Gmail (built):** for an assistant that keeps its direct Gmail connection, Shield reads Sent and Drafts, flags anything with no matching Shield approval, with the reason (a Sent record alone doesn't prove which app sent it), can remove a risky draft before it is sent, and links to revoke the assistant's access. Detection and draft removal only; no prevention on that path.
 
 **Live Contain demo (built, pending a live go/no-go test with Instinct):** Shield publishes safe lines with stable IDs (`REQ_7`, `FILE_2`) into a restricted Gmail test inbox that Instinct reads. Instinct's reply over WhatsApp is pasted into Shield's local intake as untrusted input. Shield resolves the recipient and attachment itself and runs the same checks and review page, then sends from a separate test account and verifies against Gmail Sent.
 

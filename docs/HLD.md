@@ -193,7 +193,7 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 ## 9. Implementation status
 
-All on `main`; 126 tests (`cd backend && python -m pytest -q`).
+All on `main`; 134 tests (`cd backend && python -m pytest -q`).
 
 | Slice (LLD §16) | Status |
 |---|---|

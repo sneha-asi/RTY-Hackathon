@@ -40,7 +40,8 @@ def _action_full(a) -> dict:
     d = {"id": a.id, "session_id": a.session_id, "state": a.state.value, "reason": a.reason,
          "status_text": shield.guard.status_text(a), "warnings": a.warnings,
          "checks": [c.model_dump() for c in a.checks], "args": a.args, "created_at": a.created_at,
-         "verification": a.verification, "seal": a.payload_hash}
+         "verification": a.verification, "seal": a.payload_hash, "provider_id": a.sent_message_id,
+         "approved_by": a.approved_by}
     if a.payload:
         p = a.payload
         d["payload"] = {"to": p.to, "cc": p.cc, "bcc": p.bcc, "subject": p.subject, "body": p.body,
@@ -152,6 +153,13 @@ def action_detail(aid: str, shield_owner: str | None = Cookie(default=None)):
     d = _action_full(a)
     d["client"] = shield.clients.get(a.session_id, {}).get("name", a.session_id)
     d["receipt"] = [e for e in shield.ledger.all() if e.get("action_id") == aid]
+    from . import mirror
+    req = a.request_handle
+    d["published"] = [r for r in mirror.published_records(shield) if r.get("request") == req] if req else []
+    d["assistant_reply"] = next((e for e in reversed(shield.ledger.all()) if e["kind"] == "assistant_reply"
+                                 and e.get("request") == req and e.get("session_id") == a.session_id), None)
+    d["connection"] = ("Instinct has direct Gmail access · Shield controls sends approved here"
+                       if a.session_id.startswith("mirror:") else "Assistant connected through Shield (MCP)")
     d["sent_label"] = shield.guard.sent_label
     return d
 
@@ -286,7 +294,9 @@ def mirror_publication(shield_owner: str | None = Cookie(default=None)):
     if not _user(shield_owner):
         raise HTTPException(401, "login required")
     from . import mirror
-    return mirror.publication(shield)
+    return {"preview": mirror.publication(shield), "demo_email": mirror.demo_email(shield),
+            "published": mirror.published_records(shield),
+            "connection": "Instinct has direct Gmail access · Shield controls sends approved here"}
 
 
 @app.post("/api/intake")

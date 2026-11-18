@@ -13,19 +13,24 @@ textarea,input{width:100%;background:var(--bg);color:var(--text);border:1px soli
 textarea{min-height:120px;font-family:inherit}
 button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:16px;cursor:pointer;background:var(--info);color:#071225;margin-top:10px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute);white-space:pre-wrap}
-.bad{color:var(--bad)}.warn{color:var(--warn)}
+.bad{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}
+.conn{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--mute);margin-bottom:14px}
+.email{background:var(--bg);border-radius:8px;padding:12px;white-space:pre-wrap;font-size:15px}
+.step{font-size:18px;font-weight:700;margin-top:10px}
 </style>
 </head>
 <body>
 <main>
-  <div class="brand">🛡 <b>Shield</b> · review a proposal from a closed assistant (Contain mode)</div>
+  <div class="brand">🛡 <b>Shield</b> · investor follow-ups</div>
+  <div class="conn" id="conn">Instinct has direct Gmail access · Shield controls sends approved here</div>
   <div id="login" class="card" hidden><p class="label">Owner login</p><input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><button onclick="login()">Log in</button></div>
   <div id="view" hidden>
-    <div class="card"><p class="label">1 · What Shield published to the restricted inbox</p>
-      <div class="mono" id="pub">Loading…</div>
-      <p class="mono">Only these lines are in the assistant's inbox: no addresses, no file contents.</p></div>
+    <div class="card"><p class="label">1 · Seeded into Gmail by Shield</p>
+      <div id="seeded" class="mono">Loading…</div>
+      <div class="email" id="pub"></div>
+      <p class="mono">Synthetic. Only this summary and its IDs are in the mailbox: no attachment, no destination address.</p></div>
     <div class="card"><p class="label">2 · Paste the assistant's reply</p>
-      <textarea id="text" placeholder="e.g. Prepare REQ_7 with FILE_2. Note: Ahead of Friday"></textarea>
+      <textarea id="text" placeholder="Paste Instinct's WhatsApp reply, e.g. Request REQ_7, document FILE_2. Note: Ahead of Friday"></textarea>
       <input id="source" value="Instinct (WhatsApp, pasted)" style="margin-top:8px">
       <button onclick="submitIt()">Review proposal</button>
       <p class="mono">Untrusted input: Shield takes only the request ID, the document ID and a short note. It resolves the real recipient and attachment itself and runs the same checks.</p>
@@ -36,11 +41,15 @@ button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:1
 const $=x=>document.getElementById(x);const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:$('secret').value})});if(r.ok)load();else alert('Wrong secret')}
 async function load(){const r=await fetch('/api/mirror/publication');if(r.status===401){$('login').hidden=false;$('view').hidden=true;return}
-  $('login').hidden=true;$('view').hidden=false;const p=await r.json();$('pub').textContent='Subject: '+p.subject+'\n\n'+p.body}
+  $('login').hidden=true;$('view').hidden=false;const p=await r.json();$('conn').textContent=p.connection;
+  const rec=(p.published||[]).filter(x=>x.request===p.demo_email.request).pop();
+  $('seeded').innerHTML=rec?`<span class="ok">✔ Published</span> to ${esc(rec.mailbox)} · Gmail id ${esc(rec.gmail_message_id)} · ${esc(rec.ts.slice(11,19))}`
+    :'<span class="warn">Not seeded yet.</span> Preview of what scripts/seed_demo_request.py will put in Gmail:';
+  $('pub').textContent='Subject: '+p.demo_email.subject+'\n\n'+p.demo_email.body}
 async function submitIt(){const r=await fetch('/api/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('text').value,source:$('source').value})});
   const d=await r.json();const ig=(d.parsed&&d.parsed.ignored||[]).map(x=>`<div class="warn">Ignored ${esc(x)}</div>`).join('');
   if(d.error){$('result').innerHTML=`<p class="bad">${esc(d.error)}</p>${ig}`;return}
-  if(d.review_url){location.href='/review/'+d.action_id;return}
+  if(d.review_url){$('result').innerHTML=`${ig}<div class="step">Proposal received → <span style="color:var(--info)">Awaiting approval</span></div>`;setTimeout(()=>location.href='/review/'+d.action_id,900);return}
   $('result').innerHTML=`<p class="bad">${esc(d.state)}: ${esc(d.status_text)}</p>${ig}`}
 load();
 </script>

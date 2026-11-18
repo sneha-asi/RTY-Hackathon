@@ -134,15 +134,15 @@ See [RULES.md](RULES.md) for the full list.
   - A send-attempt marker is flushed to a local journal before the provider call. A timeout becomes `VERIFICATION_PENDING` and is only ever re-verified, never resent, even after a restart.
   - A Sent record that differs from the approval is `UNVERIFIED` with the differing field. `FAILED` is reserved for messages that definitely weren't sent.
   - The MCP listener is a separate app, so a tunnel to it can't reach approval or raw data.
-  - The demo validates the core enforcement path, and the 126-test suite checks the M0 invariants: the five checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value reaches the model.
+  - The demo validates the core enforcement path, and the 134-test suite checks the M0 invariants: the five checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value reaches the model.
 - **How to run it:**
   ```bash
   cd backend && pip install -r requirements.txt && cp .env.example .env   # set SHIELD_USER_SECRET
-  python -m pytest -q        # 126 tests
+  python -m pytest -q        # 134 tests
   python run.py              # owner console http://127.0.0.1:8000 · MCP http://127.0.0.1:8765/mcp
   claude mcp add --transport http shield http://127.0.0.1:8765/mcp   # then ask: "Handle my investor follow-ups"
   ```
-  Default is the sandbox mailbox. For a live send, set `SHIELD_MAIL=gmail` with a `token.json` (gmail.send + gmail.readonly) for the sender account.
+  Set `SHIELD_USER_SECRET` (12+ characters) first: Shield refuses to start without it. Default is the sandbox mailbox. For a live send, set `SHIELD_MAIL=gmail` with a `token.json` (gmail.send + gmail.readonly) for the sender account.
 - **Demo:** "Handle my investor follow-ups." In order:
   1. The assistant sees three requests as summaries; the cap table, layoff plan, PAN and medical note appear only as withheld counts; three hidden-instruction items are quarantined.
   2. The stranger's data-room request → 🛑 BLOCKED (unknown recipient; not covered by the policy).

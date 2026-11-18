@@ -38,3 +38,32 @@ def test_intake_karan_gets_teaser_and_unknown_ids_are_blocked(shield):
     assert shield.guard.actions[mirror.intake(shield, "REQ_8 FILE_3")["action_id"]].payload.file_id == "teaser"
     assert mirror.intake(shield, "REQ_99 FILE_2")["state"] == "BLOCKED"
     assert "error" in mirror.intake(shield, "send it to priya@northbeam.vc")
+
+
+def test_preview_is_read_only_and_publication_needs_evidence(shield):
+    before = len(shield.ledger.all())
+    mirror.publication(shield)
+    mirror.demo_email(shield)
+    assert len(shield.ledger.all()) == before  # previewing records nothing
+    assert mirror.published_records(shield) == []
+    mirror.record_published(shield.settings.runtime_dir, {"mailbox": "exec@example.test", "gmail_message_id": "g1",
+                                                         "request": "REQ_7", "file": "FILE_2", "subject": "s"})
+    (rec,) = mirror.published_records(shield)
+    assert rec["gmail_message_id"] == "g1"
+
+
+def test_demo_email_is_safe():
+    import tests.conftest  # noqa: F401
+    from app.config import Settings
+    from app.mail import FakeMail
+    from app.service import Shield
+    em = mirror.demo_email(Shield(Settings(), mail=FakeMail()))
+    assert em["subject"] == "[Shield Demo] Priya — investor follow-up"
+    assert "REQ_7" in em["body"] and "FILE_2" in em["body"]
+    assert "@" not in em["body"] and ".pdf" not in em["body"] and "Rs " not in em["body"]
+
+
+def test_intake_records_the_assistant_reply_as_its_own_fact(shield):
+    mirror.intake(shield, "REQ_7 FILE_2 Note: Ahead of Friday")
+    ev = [e for e in shield.ledger.all() if e["kind"] == "assistant_reply"]
+    assert ev and ev[0]["request"] == "REQ_7" and "Ahead" not in str(ev[0])

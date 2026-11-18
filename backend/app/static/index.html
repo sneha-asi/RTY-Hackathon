@@ -52,7 +52,7 @@ input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-r
   </div>
   <main>
     <section><div class="panel" id="watchpanel" hidden><h2>Watch · what assistants did directly in <span id="wsrc"></span></h2>
-        <p class="withheld">Assistants with their own access to the mailbox (e.g. Instinct) bypass Shield. Shield reads Sent and Drafts and flags anything it did not approve.</p>
+        <p class="withheld">Assistants with their own access to the mailbox (e.g. Instinct) bypass Shield. Shield reads Sent and Drafts and flags anything it did not approve. A Sent record alone doesn't prove which app sent it.</p>
         <div id="watch"><p class="withheld">Nothing flagged.</p></div></div><br>
       <div class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></div><br>
       <div class="panel"><h2>Mailbox · Sent folder (what the verifier reads)</h2><div id="sent"><p class="withheld">Nothing sent.</p></div></div></section>
@@ -82,7 +82,7 @@ async function delDraft(id){const r=await fetch('/api/watch/drafts/'+encodeURICo
 async function watch(){const r=await fetch('/api/watch');if(!r.ok)return;const w=await r.json();if(!w.enabled)return;$('watchpanel').hidden=false;$('wsrc').textContent=w.source;
   const bad=w.alerts.filter(a=>a.severity!=='ok');
   $('watch').innerHTML=(w.error?`<p class="fail">${esc(w.error)}</p>`:'')+(bad.length?bad.map(a=>`<div class="card" style="border-color:${a.severity==='high'?'var(--bad)':'var(--warn)'}">
-    <div class="state ${a.severity==='high'?'BLOCKED':'UNVERIFIED'}">${a.status==='draft_deleted'?'🧹 DRAFT REMOVED BEFORE SENDING':(a.kind==='draft'?'⚠ RISKY DRAFT, NOT SENT YET':'🚨 SENT WITHOUT SHIELD')}</div>
+    <div class="state ${a.severity==='high'?'BLOCKED':'UNVERIFIED'}">${a.status==='draft_deleted'?'🧹 DRAFT REMOVED BEFORE SENDING':(a.kind==='draft'?'⚠ Draft observed · No matching Shield approval':'🚨 Sent message observed · No matching Shield approval')}</div>
     <p><b>To:</b> ${esc(a.to.join(', '))} · <b>${esc(a.subject)}</b>${a.attachments.length?' · 📎 '+esc(a.attachments.join(', ')):''}</p>
     ${a.reasons.map(x=>`<div class="check"><b></b><span class="fail">✘</span><span>${esc(x)}</span></div>`).join('')}
     ${a.kind==='draft'&&a.status==='open'?`<br><button onclick="delDraft('${a.id}')">Remove draft before it's sent</button>`:''}

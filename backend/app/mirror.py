@@ -45,13 +45,16 @@ def registry(shield: Shield) -> HandleRegistry:
     return reg
 
 
-def publication(shield: Shield) -> dict:
-    """What Shield writes into the restricted inbox: one safe line per eligible request. No addresses, no contents."""
+def publication(shield: Shield, only: list[str] | None = None) -> dict:
+    """PREVIEW of the safe text for the restricted inbox: one line per eligible request, no addresses, no contents.
+    Read-only: nothing is recorded as published until a script actually puts it in a mailbox (record_published)."""
     reg = registry(shield)
     pub = _published()
     file_for = {v: k for k, v in pub["files"].items()}
     lines, items = [], []
     for req_handle, info in reg.requests.items():
+        if only and req_handle not in only:
+            continue
         contact = shield.seed.contact(reg.resolve(info["sender"]).ref)
         latest = shield.seed.latest(info["category"])
         eligible = latest
@@ -62,13 +65,39 @@ def publication(shield: Shield) -> dict:
                 f"Eligible document {fid}" + ("" if eligible.id == (latest.id if latest else None)
                                               else f" ({eligible.label}; no NDA on file)") + ".")
         lines.append(line)
-        items.append({"request": req_handle, "file": fid, "line": line})
-    shield.ledger.emit("release", session_id=SESSION, purpose="restricted_inbox",
-                       released_ids=[reg.requests[i["request"]]["item_id"] for i in items],
-                       quarantined_ids=[], withheld_ids=[], withheld={})
+        items.append({"request": req_handle, "file": fid, "line": line, "first_name": contact.first_name,
+                      "role": contact.role, "nda": contact.nda, "category": info["category"]})
     body = ("Investor follow-ups (published by Shield; reply with the request ID and document ID)\n\n" +
             "\n".join(lines) + "\n")
     return {"subject": "Investor follow-ups to prepare", "body": body, "items": items}
+
+
+def demo_email(shield: Shield, request: str = "REQ_7") -> dict:
+    """The one clearly labelled synthetic email seeded into the executive's Gmail for the live recording.
+    Safe summary + IDs only: no attachment, no destination address, nothing else from the mailbox."""
+    it = next(i for i in publication(shield, [request])["items"])
+    nda = "NDA on file" if it["nda"] else "no NDA on file"
+    subject = f"[Shield Demo] {it['first_name']} — investor follow-up"
+    body = (f"{it['first_name']} ({it['role']}, {nda}) asked for the latest {it['category']}.\n\n"
+            f"Request ID: {it['request']}\nEligible document ID: {it['file']}\n\n"
+            "To prepare the follow-up, reply with the request ID, the document ID and a short note.\n"
+            "Synthetic demo content published by Shield. The document and the recipient's address stay in Shield.\n")
+    return {"subject": subject, "body": body, "request": it["request"], "file": it["file"]}
+
+
+def record_published(runtime_dir: Path, rec: dict) -> None:
+    """Called only after a mailbox accepted the message (evidence: the provider's message id)."""
+    from .journal import secure_append, secure_dir
+    from .ledger import now_iso
+    secure_dir(runtime_dir)
+    secure_append(runtime_dir / "publications.jsonl", json.dumps({"ts": now_iso(), **rec}))
+
+
+def published_records(shield: Shield) -> list[dict]:
+    p = shield.settings.runtime_dir / "publications.jsonl"
+    if not p.exists():
+        return []
+    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
 
 
 def parse(text: str) -> dict:
@@ -93,6 +122,10 @@ def intake(shield: Shield, text: str, source: str = "Instinct (WhatsApp, pasted)
         return {"error": "More than one request or document ID; paste one proposal at a time.", "parsed": parsed}
     reg = registry(shield)
     shield.note_client(SESSION, source)
+    # separate fact from "Shield published": what the assistant returned (IDs only; the note's text stays out of the ledger)
+    shield.ledger.emit("assistant_reply", session_id=SESSION, source=source, request=parsed["request"],
+                       file=parsed["file"], note_chars=len(parsed["note"]), ignored=len(parsed["ignored"]))
     a = shield.guard.propose_send_document(SESSION, reg, parsed["request"], parsed["file"], parsed["note"])
+    a.args.update({"source": source, "ignored": parsed["ignored"]})
     view = shield.guard.view_for_model(a)
     return {**view, "parsed": parsed}

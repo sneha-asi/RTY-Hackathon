@@ -22,7 +22,8 @@ if __name__ == "__main__":
     ap.add_argument("--token", default="token_restricted.json")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    pub = mirror.publication(Shield(Settings(), mail=FakeMail()))
+    settings = Settings()
+    pub = mirror.publication(Shield(settings, mail=FakeMail()))
     print(f"Subject: {pub['subject']}\n\n{pub['body']}")
     if a.dry_run:
         sys.exit(0)
@@ -36,4 +37,8 @@ if __name__ == "__main__":
     m.set_content(pub["body"])
     res = svc.users().messages().insert(userId="me", body={"raw": base64.urlsafe_b64encode(m.as_bytes()).decode(),
                                                            "labelIds": ["INBOX", "UNREAD"]}).execute()
+    account = svc.users().getProfile(userId="me").execute().get("emailAddress", "restricted inbox")
+    for it in pub["items"]:
+        mirror.record_published(settings.runtime_dir, {"mailbox": account, "gmail_message_id": res["id"],
+                                                       "subject": pub["subject"], "request": it["request"], "file": it["file"]})
     print("inserted into restricted inbox:", res.get("id"))
