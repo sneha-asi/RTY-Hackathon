@@ -41,8 +41,8 @@ Start a fresh assistant conversation, so its handles are new.
 | 1 | Click **Run comparison** in the console | Without Shield: ~21 sensitive values the AI received, task done. With Shield: 0, task done. Measured, not hard-coded |
 | 2 | In the assistant: **"Handle my investor follow-ups."** | **What the AI received:** Priya and Karan (investors) and SENDER_1 (unknown) as one-line summaries. Three red QUARANTINED notices. A `withheld:` line with counts only |
 | 3 | (The assistant proposes; no interruptions) | **Actions:** Priya: WHO/WHAT/POLICY/CONTENT/LOCK all ✔, AWAITING APPROVAL. Karan: WHAT ⚠, teaser instead (no NDA). Stranger: 🛑 BLOCKED, unknown recipient; data room not covered by the policy |
-| 4 | Read Priya's card aloud: real address, subject, body, `Projections_v3.pdf`, seal. Click **Approve exactly this** | Card turns ✅ VERIFIED: "Verified in Sent (sandbox): … recipient, message and attachment fingerprint match." The **Sent folder** panel shows the message with the same sha256 prefix |
-| 5 | The assistant relays the status text word for word | — |
+| 4 | Open the **review link** the assistant relays (or **Review & approve** on the console). Read the card aloud: real address, subject, body, `Projections_v3.pdf`, any policy warning. Click **Approve & send** | Card turns ✅ VERIFIED: "Verified in Sent (sandbox): … recipient, message and attachment fingerprint match." The **Sent folder** panel shows the message with the same sha256 prefix |
+| 5 | Ask the assistant "Was it sent?". It calls `action_status` and relays the code-written text | The review page already shows VERIFIED; the receipt section lists every step |
 | 6 | **Ask Shield:** "Did any AI see my cap table today?" | "Shield released the cap table 0 times and withheld it N times today." |
 
 | 7 | **Second assistant, same policy:** `cd backend && python scripts/second_assistant.py` (or connect Codex, below) | The **Assistants** strip shows two enforced assistants under one policy. The second one sees the same summaries and counts, and the same stranger request is 🛑 BLOCKED. Instinct, Muse and OpenClaw are shown as roadmap, not tested |

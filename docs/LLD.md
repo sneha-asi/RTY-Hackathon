@@ -706,7 +706,8 @@ Example: `propose_send_document("THREAD_1","FILE_2","Ahead of Friday")` →
 |---|---|---|
 | GET | `/api/state` | Counters, sessions, actions (dashboard view incl. real resolved payload), latest harness results |
 | GET | `/api/events?since=<seq>` | SSE stream of ledger events (`event: ledger`, `id: seq`); `epoch` change → client reloads |
-| GET | `/api/actions/{id}` | Full action with the resolved payload (recipient email, file name, sha) — dashboard only |
+| GET | `/api/actions/{id}` | Owner only: the real resolved payload, the proposing client and the action's ledger events (receipt) |
+| GET | `/review/{id}` | The single approval page every assistant links to (`review_url`); static shell, data from the owner-only API |
 | POST | `/api/login` | body `{secret}` → sets the `owner` session cookie (HttpOnly, SameSite=Strict) |
 | POST | `/api/actions/{id}/approve` | Owner cookie required; body `{seal}` must equal the action's seal (401 / 409 otherwise); §5.4 |
 | POST | `/api/actions/{id}/reject` | Owner cookie required |

@@ -79,7 +79,7 @@ async function ask(){const r=await fetch('/api/receipts?q='+encodeURIComponent($
 function renderAction(a){
   const checks=a.checks.map(c=>`<div class="check"><b>${c.name}</b><span class="${c.status}">${icon[c.status]}</span><span>${esc(c.detail)}</span></div>`).join('');
   const p=a.payload?`<div class="payload"><b>To:</b> ${esc(a.payload.to.join(', '))}\n<b>Subject:</b> ${esc(a.payload.subject)}\n<b>Attachment:</b> ${a.payload.file_name?esc(a.payload.file_name)+' · sha256 '+esc(a.payload.attachment_sha256.slice(0,16))+'…':'none'}\n\n${esc(a.payload.body)}</div><div class="mono">seal ${esc((a.seal||'').slice(0,16))}… · ${esc(a.args.request?'request '+a.args.request:'thread '+(a.args.thread||''))}</div>`:'';
-  const btn=a.state==='AWAITING_APPROVAL'?`<br><button onclick="act('${a.id}','approve','${a.seal}')">Approve exactly this</button> <button class="secondary" onclick="act('${a.id}','reject')">Reject</button>`:'';
+  const btn=a.payload?`<br><a href="/review/${a.id}" target="_blank"><button>${a.state==='AWAITING_APPROVAL'?'Review & approve':'Open review'}</button></a>`:'';
   return `<div class="card"><div class="state ${a.state}">${a.state.replace('_',' ')}</div><p>${esc(a.status_text)}</p>${checks}${p}${btn}</div>`}
 function renderSeen(v){
   const r=v.result;let body='';

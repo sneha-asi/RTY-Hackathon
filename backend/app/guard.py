@@ -97,10 +97,11 @@ class Guard:
     def __init__(self, seed: Seed, ledger: Ledger, mail, founder_name: str, sender_addr: str,
                  backoff: tuple[float, ...] = (1, 2, 4, 8, 15, 30, 60),
                  scheduler: Callable[[Callable[[], None]], None] | None = None, journal=None,
-                 sent_label: str = "Sent (sandbox)"):
+                 sent_label: str = "Sent (sandbox)", review_base: str = "http://127.0.0.1:8000"):
         self.seed, self.ledger, self.mail = seed, ledger, mail
         self.journal = journal
         self.sent_label = sent_label
+        self.review_base = review_base.rstrip("/")
         self.founder_name, self.sender_addr = founder_name, sender_addr
         self.backoff = backoff
         self.actions: dict[str, Action] = {}
@@ -389,7 +390,7 @@ class Guard:
         return {
             State.PROPOSED: "Proposed.",
             State.BLOCKED: f"Blocked: {a.reason}.",
-            State.AWAITING_APPROVAL: f"Waiting for your approval in Shield: {f} to {r}.",
+            State.AWAITING_APPROVAL: f"Waiting for your approval in Shield: {f} to {r}. Review: {self.review_url(a)}",
             State.REJECTED: "You rejected this. Nothing was sent.",
             State.APPROVED: "Approved; sending.",
             State.EXECUTING: "Sending now.",
@@ -401,9 +402,14 @@ class Guard:
                                f"May have been sent, but Shield could not confirm it in {self.sent_label}. It will not be resent. Not counted as done."),
         }[a.state]
 
+    def review_url(self, a: Action) -> str:
+        """Identifies the action on the owner-only listener. Carries no credential; the page needs the owner login."""
+        return f"{self.review_base}/review/{a.id}"
+
     def view_for_model(self, a: Action) -> dict:
         return {"action_id": a.id, "state": a.state.value, "status_text": self.status_text(a),
                 "request": a.request_handle if a.request_handle and HANDLE_RX.match(a.request_handle) else None,
+                "review_url": self.review_url(a) if a.payload else None,
                 "checks": [{"name": c.name, "status": c.status, "detail": c.detail} for c in a.checks],
                 "warnings": a.warnings}
 

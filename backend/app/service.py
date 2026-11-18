@@ -39,7 +39,8 @@ class Shield:
         self.journal = SendJournal(s.runtime_dir / "send_journal.jsonl")
         self.guard = Guard(self.seed, self.ledger, self.mail, s.founder_name, sender, s.verify_backoff, self.scheduler,
                            journal=self.journal,
-                           sent_label="Gmail Sent" if s.mail_backend == "gmail" else "Sent (sandbox)")
+                           sent_label="Gmail Sent" if s.mail_backend == "gmail" else "Sent (sandbox)",
+                           review_base=s.review_base)
         self.policies: dict = json.loads((s.data_dir / "policy.json").read_text())
         self.sessions: dict[str, HandleRegistry] = {}
         self.guard.recover()

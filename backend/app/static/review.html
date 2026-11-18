@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shield review</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--text:#e8ebf1;--mute:#9aa3b2;--ok:#3ecf8e;--warn:#f5b74a;--bad:#ff5d5d;--info:#6aa8ff}
+:root[data-theme="light"]{--bg:#f6f7f9;--panel:#fff;--line:#dde1e7;--text:#14171c;--mute:#5d6673}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px}
+.brand{color:var(--mute);font-size:14px;margin-bottom:14px}.brand b{color:var(--text)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+.state{font-size:22px;font-weight:700}.VERIFIED{color:var(--ok)}.BLOCKED,.FAILED,.REJECTED{color:var(--bad)}.UNVERIFIED,.VERIFICATION_PENDING{color:var(--warn)}.AWAITING_APPROVAL{color:var(--info)}
+.to{font-size:20px;font-weight:600}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute);word-break:break-all}
+.body{white-space:pre-wrap;background:var(--bg);border-radius:8px;padding:12px;margin-top:8px}
+.warn{background:#3a2c10;border:1px solid var(--warn);color:#ffe2a8;border-radius:8px;padding:8px 10px;margin-top:8px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:16px;cursor:pointer}
+.approve{background:var(--ok);color:#06210f}.reject{background:#2b313d;color:var(--text)}
+input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;width:100%}
+details summary{cursor:pointer;color:var(--mute)}.check{display:grid;grid-template-columns:80px 22px 1fr;gap:6px;font-size:15px;padding:2px 0}
+.pass{color:var(--ok)}.fail{color:var(--bad)}.warnc{color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">🛡 <b>Shield</b> · review one action · <span id="client"></span></div>
+  <div id="login" class="card" hidden>
+    <p class="label">Owner login</p>
+    <p>This page shows the real recipient and attachment, so it needs your Shield login. The link itself grants nothing.</p>
+    <input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><div class="row"><button class="approve" onclick="login()">Log in</button></div>
+  </div>
+  <div id="view" hidden>
+    <div class="card"><p class="label">Status</p><div id="state" class="state"></div><div id="status"></div></div>
+    <div class="card"><p class="label">Recipient and message</p><div class="to" id="to"></div><div id="subject"></div><div class="body" id="body"></div></div>
+    <div class="card"><p class="label">Attachment and policy</p><div id="att"></div><div id="warnings"></div><div class="mono" id="seal" style="margin-top:6px"></div></div>
+    <div class="card" id="controls" hidden><div class="row"><button class="approve" onclick="act('approve')">Approve &amp; send</button><button class="reject" onclick="act('reject')">Reject</button></div>
+      <p class="mono" style="margin-top:8px">Approves exactly this recipient, message and attachment. Any change after approval fails before sending.</p></div>
+    <div class="card"><details><summary>Receipt: checks and every step</summary><div id="checks" style="margin-top:8px"></div><div id="receipt" class="mono" style="margin-top:8px"></div></details></div>
+  </div>
+  <div id="missing" class="card" hidden>No such action.</div>
+</main>
+<script>
+const id=location.pathname.split('/').pop();const $=x=>document.getElementById(x);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TERMINAL=['BLOCKED','REJECTED','VERIFIED','FAILED','UNVERIFIED'];let seal='';
+async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:$('secret').value})});if(r.ok)load();else alert('Wrong secret')}
+async function act(kind){const r=await fetch(`/api/actions/${id}/${kind}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seal})});if(!r.ok)alert((await r.json()).detail);load()}
+async function load(){
+  const r=await fetch('/api/actions/'+id);
+  if(r.status===401){$('login').hidden=false;$('view').hidden=true;return}
+  if(r.status===404){$('missing').hidden=false;return}
+  const a=await r.json();seal=a.seal||'';$('login').hidden=true;$('view').hidden=false;
+  $('client').textContent='proposed by '+(a.client||'an assistant');
+  $('state').textContent=a.state.replaceAll('_',' ');$('state').className='state '+a.state;$('status').textContent=a.status_text.replace(/ Review: \S+$/,'');
+  const p=a.payload||{};$('to').textContent=(p.to||[]).join(', ')||'—';$('subject').textContent=p.subject?'Subject: '+p.subject:'';$('body').textContent=p.body||'';
+  $('att').innerHTML=p.file_name?`<b>${esc(p.file_name)}</b> <span class="mono">sha256 ${esc(p.attachment_sha256)}</span>`:'No attachment';
+  $('warnings').innerHTML=(a.warnings||[]).map(w=>`<div class="warn">⚠ ${esc(w)}</div>`).join('');
+  $('seal').textContent=seal?'seal '+seal:'';
+  $('controls').hidden=a.state!=='AWAITING_APPROVAL';
+  $('checks').innerHTML=a.checks.map(c=>`<div class="check"><b>${c.name}</b><span class="${c.status==='warn'?'warnc':c.status}">${{pass:'✔',fail:'✘',warn:'⚠',pending:'·'}[c.status]}</span><span>${esc(c.detail)}</span></div>`).join('');
+  $('receipt').innerHTML=a.receipt.map(e=>`${esc(e.ts.slice(11,19))} ${esc(e.kind)} ${esc(e.to||'')} ${esc(e.reason||'')}`).join('<br>');
+  if(!TERMINAL.includes(a.state)||a.state==='AWAITING_APPROVAL')setTimeout(load,1500)}
+load();
+</script>
+</body>
+</html>

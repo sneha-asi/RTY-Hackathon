@@ -92,7 +92,7 @@ The PRD's first principles (PRD § "First principles") lead to these design prin
  ┌──────────── user-controlled machine / infrastructure ────────────┐
  │  raw data · credentials (token.json) · broker · guard · executor   │
  │  verifier · ledger · send journal                                  │
- │  OWNER CONSOLE 127.0.0.1:8000  (login, approval preview, SSE, dev) │  ← never tunnelled
+ │  OWNER LISTENER 127.0.0.1:8000 (login, /review/<id>, console, SSE) │  ← never tunnelled
  │  MCP LISTENER  :8765/mcp       (filtered tools only)               │  ← the only exposed surface
  └────────────────────────────────────────┬──────────────────────────┘
                                           ▼
@@ -111,6 +111,8 @@ The MCP listener is a separate ASGI app with no owner routes; a tunnel to it can
 | Provider → Shield | Send result; Sent-folder record by Message-ID | — | Verifier compares against sealed values |
 | Shield → logs | IDs, labels, hashes, reasons | Bodies, addresses, attachments | Ledger schema; ledger-privacy test |
 | Secrets | `.env`, `token.json`, user secret | Anything in git | `.gitignore`; env-only config |
+
+**One approval page for every assistant.** Every proposal that reaches approval returns a `review_url` (`/review/<action_id>` on the owner-only listener). Claude, OpenClaw, or any MCP client relays the same link. The link identifies the action and carries no credential; the page needs the executive's Shield login. It shows one card: the real recipient and message, the attachment and any policy warning, **Approve & send / Reject**, and the verified status as it updates, with the receipt in a collapsible section. The assistant can fetch the same outcome with `action_status`.
 
 ## 5. Access paths
 
@@ -150,7 +152,7 @@ search(purpose, query) → for each item: clean → label → purpose rule → (
 propose_send_document(THREAD_1, FILE_2, note)     # the request handle, not a recipient
   → argument gate → WHO → WHAT → POLICY → CONTENT          (all run; any fail → BLOCKED)
   → read file once → build exact MIME → seal               (LOCK)
-  → AWAITING_APPROVAL → dashboard card
+  → AWAITING_APPROVAL → review_url (/review/<id>, owner listener) returned to the assistant
 user approve(seal)
   → re-read once → hash checks → send those bytes          (send_attempted = true first)
   → verifier: find by Message-ID in the mailbox's Sent record → VERIFIED | UNVERIFIED (record differs) | VERIFICATION_PENDING → retry → VERIFIED | UNVERIFIED
@@ -191,7 +193,7 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 ## 9. Implementation status
 
-All on `main`; 115 tests (`cd backend && python -m pytest -q`).
+All on `main`; 117 tests (`cd backend && python -m pytest -q`).
 
 | Slice (LLD §16) | Status |
 |---|---|

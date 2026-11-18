@@ -348,6 +348,8 @@ There is deliberately **no `send_email(to, …)`**. The Direct baseline (compari
 | CONTENT | No external URLs, markdown images, raw emails, handles or sensitive patterns; length cap | Any found |
 | LOCK | Seal at proposal (M0: exactly one `To`, no `Cc`/`Bcc`); recompute at execution | Hash mismatch → FAILED, nothing sent |
 
+**One approval page for every assistant.** Every proposal that reaches approval returns a `review_url` (`/review/<action_id>` on the owner-only listener). Claude, OpenClaw, or any MCP client relays the same link. The link identifies the action and carries no credential; the page needs the executive's Shield login. It shows one card: the real recipient and message, the attachment and any policy warning, **Approve & send / Reject**, and the verified status as it updates, with the receipt in a collapsible section. The assistant can fetch the same outcome with `action_status`.
+
 **Who can approve.** Only the authenticated user. The dashboard's approve/reject endpoints require the user's session (login with a user secret set at install; the MCP client never holds it). There is no approve tool on the MCP surface, so no model, prompt or tool call can approve. An approval request must carry the seal shown on screen; if it doesn't match the action's current seal, the approval is refused.
 
 **What gets sealed.** At proposal, code builds the **exact outgoing message**: the complete MIME bytes (headers, body, attachment, with a fixed Message-ID and boundary), the **full recipient list** (To, Cc, Bcc) and the **attachment SHA-256**.

@@ -139,6 +139,21 @@ async def harness_run(req: Request, shield_owner: str | None = Cookie(default=No
     return HARNESS
 
 
+@app.get("/api/actions/{aid}")
+def action_detail(aid: str, shield_owner: str | None = Cookie(default=None)):
+    """Owner-only: the real resolved payload plus this action's ledger events (the receipt)."""
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    a = shield.guard.actions.get(aid)
+    if a is None:
+        raise HTTPException(404)
+    d = _action_full(a)
+    d["client"] = shield.clients.get(a.session_id, {}).get("name", a.session_id)
+    d["receipt"] = [e for e in shield.ledger.all() if e.get("action_id") == aid]
+    d["sent_label"] = shield.guard.sent_label
+    return d
+
+
 @app.post("/api/actions/{aid}/approve")
 async def approve(aid: str, req: Request, shield_owner: str | None = Cookie(default=None)):
     body = await req.json()
@@ -222,6 +237,12 @@ async def dev_mail_fault(req: Request, shield_owner: str | None = Cookie(default
         shield.mail.fail_mode = body.get("mode")
         shield.mail.lag = int(body.get("lag", 0))
     return {"ok": True}
+
+
+@app.get("/review/{aid}")
+def review_page(aid: str):
+    """The single approval page every assistant links to. Static shell; data comes from the owner-only API."""
+    return FileResponse(STATIC / "review.html")
 
 
 @app.get("/")

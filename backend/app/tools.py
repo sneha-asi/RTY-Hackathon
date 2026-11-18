@@ -77,4 +77,5 @@ def action_status(shield: Shield, session_id: str, action_id: str) -> dict:
     a = shield.guard.actions.get(action_id)
     if a is None or a.session_id != session_id:
         return {"action_id": action_id, "state": "UNKNOWN", "status_text": "No such action in this session."}
-    return {"action_id": a.id, "state": a.state.value, "status_text": shield.guard.status_text(a)}
+    return {"action_id": a.id, "state": a.state.value, "status_text": shield.guard.status_text(a),
+            "review_url": shield.guard.review_url(a) if a.payload else None}
