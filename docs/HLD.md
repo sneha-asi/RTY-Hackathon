@@ -123,7 +123,7 @@ The full product has four modes (PRD §4). M0 implements mode 1.
 | 1. Enforce (MCP; Shield is the only route) | **Built** | All invariants I1–I10. Sole path shown as yes / no / unknown |
 | 2. Enforce at the edge (local proxy / extension) | Roadmap | Egress blocking, partial read control |
 | 3. Contain (supported mirror for closed assistants) | **Demo built**: safe publication with stable IDs into a restricted test inbox + untrusted paste intake → same checks and review page; live Instinct handoff pending the go/no-go test | Minimisation by construction; mirror sends gated |
-| 4. Watch and revoke | Roadmap | After-the-fact detection, as far as each provider exposes |
+| 4. Watch and revoke | **Built for Gmail**: reads Sent and Drafts, flags anything not approved through Shield (confidential file, unknown recipient, sensitive values, links), removes risky drafts, links to revoke access | After-the-fact detection, as far as each provider exposes |
 
 How each focus assistant is reached (PRD §1):
 
@@ -193,7 +193,7 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 ## 9. Implementation status
 
-All on `main`; 122 tests (`cd backend && python -m pytest -q`).
+All on `main`; 126 tests (`cd backend && python -m pytest -q`).
 
 | Slice (LLD §16) | Status |
 |---|---|

@@ -239,6 +239,44 @@ async def dev_mail_fault(req: Request, shield_owner: str | None = Cookie(default
     return {"ok": True}
 
 
+@app.get("/api/watch")
+async def watch(shield_owner: str | None = Cookie(default=None)):
+    """Mode 4: what an assistant did directly in the mailbox (Sent and Drafts), assessed by Shield."""
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    from .watch import REVOKE_URL
+    if shield.watcher is None:
+        return {"enabled": False}
+    try:
+        alerts = await asyncio.to_thread(shield.watcher.scan)
+        err = None
+    except Exception as e:
+        alerts, err = list(shield.watcher.alerts.values()), f"{type(e).__name__}: {e}"
+    return {"enabled": True, "source": shield.watcher.source.label, "revoke_url": REVOKE_URL, "error": err,
+            "alerts": [a.__dict__ for a in alerts]}
+
+
+@app.post("/api/watch/drafts/{alert_id:path}/delete")
+def watch_delete_draft(alert_id: str, shield_owner: str | None = Cookie(default=None)):
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    try:
+        return shield.watcher.delete_draft(alert_id).__dict__
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/dev/watch/simulate")
+async def dev_watch_simulate(req: Request, shield_owner: str | None = Cookie(default=None)):
+    _dev(req, shield_owner)
+    from .watch import FakeWatchSource, simulate
+    if not isinstance(shield.watcher.source, FakeWatchSource):
+        raise HTTPException(400, "simulation only with SHIELD_WATCH=fake")
+    body = await req.json()
+    simulate(shield.watcher.source, shield, body.get("scenario", "forward_cap_table"))
+    return {"ok": True}
+
+
 @app.get("/api/mirror/publication")
 def mirror_publication(shield_owner: str | None = Cookie(default=None)):
     """The safe text Shield publishes into the restricted demo inbox (Contain mode)."""

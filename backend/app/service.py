@@ -44,6 +44,13 @@ class Shield:
         self.policies: dict = json.loads((s.data_dir / "policy.json").read_text())
         self.sessions: dict[str, HandleRegistry] = {}
         self.guard.recover()
+        from .watch import FakeWatchSource, GmailWatchSource, Watcher
+        if s.watch == "gmail":
+            self.watcher = Watcher(self, GmailWatchSource(s.watch_token))
+        elif s.watch == "fake":
+            self.watcher = Watcher(self, FakeWatchSource())
+        else:
+            self.watcher = None
         self.model_view: list[dict] = []  # exactly what the model received, for the dashboard
         self.clients: dict[str, dict] = {}  # MCP session id -> {name, version, calls, first_seen, last_seen}
 

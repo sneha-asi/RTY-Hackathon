@@ -2,7 +2,7 @@
 
 **Claude builds the M0 layer; Codex reviews.** The one-pager, PRD, HLD and LLD are the source of truth. Rules from [AGENTS.md](../AGENTS.md) apply: small commits, push often, no force-push, no history rewrite, no secrets in git.
 
-## Built (on `main`, 122 tests)
+## Built (on `main`, 126 tests)
 
 Run `cd backend && python -m pytest -q`, then `python run.py`.
 

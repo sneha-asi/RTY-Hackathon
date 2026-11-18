@@ -5,6 +5,9 @@
   Restricted demo inbox (the one Instinct can read), only to seed it:
     python scripts/gmail_token.py --out token_restricted.json --scopes insert
 
+  Your own Gmail, for the before/after demo (runs only on your laptop; the token stays there):
+    python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
+
 Needs credentials.json (Google Cloud OAuth client, type Desktop) in backend/. Both files are git-ignored."""
 import argparse
 
@@ -12,7 +15,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOPES = {"send": "https://www.googleapis.com/auth/gmail.send",
           "readonly": "https://www.googleapis.com/auth/gmail.readonly",
-          "insert": "https://www.googleapis.com/auth/gmail.insert"}
+          "insert": "https://www.googleapis.com/auth/gmail.insert",
+          "modify": "https://www.googleapis.com/auth/gmail.modify",    # seed + clean up labelled demo mail
+          "compose": "https://www.googleapis.com/auth/gmail.compose"}  # lets the watcher remove a risky draft
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

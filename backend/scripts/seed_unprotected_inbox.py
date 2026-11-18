@@ -1,4 +1,7 @@
-"""'Without Shield' scene: copy the full synthetic executive inbox (16 emails: investor requests, term sheet,
+"""'Without Shield' scene. For your own Gmail, always pass --label "Shield demo" (subjects get a [DEMO] prefix) and
+remove everything afterwards with scripts/cleanup_demo_mail.py.
+
+'Without Shield' scene: copy the full synthetic executive inbox (16 emails: investor requests, term sheet,
 layoff plan, GST/PAN, medical note, cap-table board prep, and the hidden-instruction attacks) into a Gmail TEST
 account that Instinct connects to directly. All data is synthetic. Never run this against a personal account.
 
@@ -26,6 +29,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--token", default="token_unprotected.json")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--label", default="", help='add a label (e.g. "Shield demo") so cleanup_demo_mail.py can remove them; needs the modify scope')
     a = ap.parse_args()
     missing: set[str] = set()
     emails = json.loads(fill_placeholders((DATA / "emails.json").read_text(), missing))
@@ -53,7 +57,13 @@ if __name__ == "__main__":
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     svc = build("gmail", "v1", credentials=Credentials.from_authorized_user_file(a.token), cache_discovery=False)
+    label_ids = ["INBOX", "UNREAD"]
+    if a.label:
+        existing = {l["name"]: l["id"] for l in svc.users().labels().list(userId="me").execute().get("labels", [])}
+        lid = existing.get(a.label) or svc.users().labels().create(userId="me", body={"name": a.label}).execute()["id"]
+        label_ids.append(lid)
     for eid, subj, m in msgs:
+        m.replace_header("Subject", f"[DEMO] {subj}") if a.label else None
         svc.users().messages().insert(userId="me", body={"raw": base64.urlsafe_b64encode(m.as_bytes()).decode(),
-                                                         "labelIds": ["INBOX", "UNREAD"]}).execute()
+                                                         "labelIds": label_ids}).execute()
     print(f"inserted {len(msgs)} synthetic emails")

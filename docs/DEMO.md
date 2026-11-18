@@ -127,3 +127,52 @@ Expect `VERIFIED`, and the email in the recipient inbox.
 | **With Shield** | The restricted demo inbox (Shield's safe publication only) | The same request returns only `REQ_7` / `FILE_2`. The proposal goes through Shield: review page, one approval, Verified in Gmail Sent. The stranger is never in its view |
 
 Switch Instinct's Gmail connection between the two scenes, or use two Instinct profiles. Disconnect your personal Gmail from the Instinct profile used on stage: whatever Instinct can reach directly is outside Shield's protection.
+
+## Recording: Instinct on your own Gmail, then Shield (the video)
+
+Everything runs on your laptop; the Gmail tokens never leave it. All seeded mail is **synthetic**, labelled **Shield demo**, with subjects prefixed **[DEMO]**. Remove it all afterwards with `cleanup_demo_mail.py`.
+
+**Setup (once):**
+
+```bash
+python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
+```
+
+Log in as the Gmail account Instinct is connected to.
+
+```bash
+python scripts/seed_unprotected_inbox.py --token token_watch.json --label "Shield demo"
+```
+
+This adds 16 [DEMO] emails: investor requests, term sheet, cap table attached to "Board prep", layoff plan, PAN/GST, a medical note, the hidden-instruction emails, and a stranger asking for the data room. In `backend/.env`, set `SHIELD_WATCH=gmail` and `WATCH_GMAIL_TOKEN=token_watch.json`, then run `python run.py`.
+
+**Scene 1: Without Shield (~60s).** In WhatsApp, ask Instinct: "Check my inbox and handle my investor follow-ups." Show what it reads and does. The **Watch** panel on the Shield console checks your Sent and Drafts every few seconds:
+
+- If Instinct **drafts** a reply to the stranger, or attaches the cap table: ⚠ **RISKY DRAFT, NOT SENT YET**, with the reasons. Click **Remove draft before it's sent**.
+- If Instinct **sends**: 🚨 **SENT WITHOUT SHIELD**, with the reasons (unknown recipient, confidential file, link). Click **Revoke the assistant's access**, which opens Google's connected-apps page.
+- If Instinct does neither, say so. It still read the cap table, PAN and medical note, and saw the injected instructions. That's the exposure Shield removes in scene 2.
+
+**Scene 2: With Shield (~90s).** Instinct now works from the restricted inbox (Contain, above) or Claude via MCP. Show:
+
+1. It only knows `REQ_7` and `FILE_2`.
+2. Paste its reply into **Review a proposal from Instinct**.
+3. The same review page shows the real recipient and attachment.
+4. **Approve & send** once → **Verified in Gmail Sent**.
+
+**Scene 3: Proof (~20s).** "Did any AI see my cap table today?" and the Direct-vs-Shielded comparison (21 vs 0).
+
+**Say this out loud:** Shield can't block an assistant inside its own direct Gmail connection. On that path it watches and lets you remove or revoke. Prevention comes from moving the assistant onto Shield's path.
+
+**Rehearse offline** (`SHIELD_WATCH=fake`):
+
+```bash
+curl -X POST -H "X-Shield-Secret: $SHIELD_USER_SECRET" -H "Content-Type: application/json" -d '{"scenario":"forward_cap_table"}' http://127.0.0.1:8000/dev/watch/simulate
+```
+
+Run it again with `"draft_data_room"` for the draft case.
+
+**After recording:**
+
+```bash
+python scripts/cleanup_demo_mail.py --token token_watch.json
+```

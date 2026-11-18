@@ -34,3 +34,4 @@ credentials.json
 runtime/
 backend/runtime/
 token_*.json
+token_watch.json

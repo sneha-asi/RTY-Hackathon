@@ -51,7 +51,10 @@ input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-r
     <div class="counter"><b id="c-v">0</b><span>verified in Sent</span></div>
   </div>
   <main>
-    <section><div class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></div><br>
+    <section><div class="panel" id="watchpanel" hidden><h2>Watch · what assistants did directly in <span id="wsrc"></span></h2>
+        <p class="withheld">Assistants with their own access to the mailbox (e.g. Instinct) bypass Shield. Shield reads Sent and Drafts and flags anything it did not approve.</p>
+        <div id="watch"><p class="withheld">Nothing flagged.</p></div></div><br>
+      <div class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></div><br>
       <div class="panel"><h2>Mailbox · Sent folder (what the verifier reads)</h2><div id="sent"><p class="withheld">Nothing sent.</p></div></div></section>
     <section>
       <div class="panel"><h2>What the AI received</h2><div id="seen"><p class="withheld">Nothing yet.</p></div></div><br>
@@ -75,6 +78,15 @@ async function runHarness(runner){$('harness').innerHTML='<p class="withheld">Ru
 function renderHarness(h){if(!h||h.status==='not run')return;if(h.status!=='done'){$('harness').innerHTML=`<p class="withheld">${esc(h.status)} ${esc(h.error||'')}</p>`;return}
   const row=r=>`<tr><td><b>${r.mode==='direct'?'Without Shield':'With Shield'}</b></td><td class="${r.sensitive_values_exposed?'fail':'pass'}" style="font-size:22px">${r.sensitive_values_exposed}</td><td class="${r.task_completed?'pass':'fail'}">${r.task_completed?'yes':'no'}</td><td>${r.sent_to_unknown_recipients}</td><td class="mono">${esc((r.exposed_examples||[]).slice(0,3).join(' · '))}</td></tr>`;
   $('harness').innerHTML=`<div class="mono">"${esc(h.task)}" · runner: ${esc(h.runner)}${h.results[0].model?' · '+esc(h.results[0].model):''}</div><table style="width:100%;margin-top:6px;border-collapse:collapse"><tr class="withheld"><th align=left></th><th align=left>sensitive values the AI received</th><th align=left>task done</th><th align=left>sent to strangers</th><th align=left>examples</th></tr>${h.results.map(row).join('')}</table>`}
+async function delDraft(id){const r=await fetch('/api/watch/drafts/'+encodeURIComponent(id)+'/delete',{method:'POST'});if(!r.ok)alert((await r.json()).detail);watch()}
+async function watch(){const r=await fetch('/api/watch');if(!r.ok)return;const w=await r.json();if(!w.enabled)return;$('watchpanel').hidden=false;$('wsrc').textContent=w.source;
+  const bad=w.alerts.filter(a=>a.severity!=='ok');
+  $('watch').innerHTML=(w.error?`<p class="fail">${esc(w.error)}</p>`:'')+(bad.length?bad.map(a=>`<div class="card" style="border-color:${a.severity==='high'?'var(--bad)':'var(--warn)'}">
+    <div class="state ${a.severity==='high'?'BLOCKED':'UNVERIFIED'}">${a.status==='draft_deleted'?'🧹 DRAFT REMOVED BEFORE SENDING':(a.kind==='draft'?'⚠ RISKY DRAFT, NOT SENT YET':'🚨 SENT WITHOUT SHIELD')}</div>
+    <p><b>To:</b> ${esc(a.to.join(', '))} · <b>${esc(a.subject)}</b>${a.attachments.length?' · 📎 '+esc(a.attachments.join(', ')):''}</p>
+    ${a.reasons.map(x=>`<div class="check"><b></b><span class="fail">✘</span><span>${esc(x)}</span></div>`).join('')}
+    ${a.kind==='draft'&&a.status==='open'?`<br><button onclick="delDraft('${a.id}')">Remove draft before it's sent</button>`:''}
+    ${a.kind==='sent'?`<br><a href="${w.revoke_url}" target="_blank"><button class="secondary">Revoke the assistant's access</button></a>`:''}</div>`).join(''):'<p class="withheld">Nothing flagged.</p>')}
 async function ask(){const r=await fetch('/api/receipts?q='+encodeURIComponent($('q').value));$('answer').textContent=(await r.json()).answer}
 function renderAction(a){
   const checks=a.checks.map(c=>`<div class="check"><b>${c.name}</b><span class="${c.status}">${icon[c.status]}</span><span>${esc(c.detail)}</span></div>`).join('');
@@ -100,7 +112,7 @@ let es;function boot(){refresh();if(es)es.close();es=new EventSource('/api/event
   es.addEventListener('ledger',e=>{const ev=JSON.parse(e.data);const line=document.createElement('div');
     line.textContent=`${ev.ts.slice(11,19)} ${ev.kind} ${ev.action_id||''} ${ev.to||ev.purpose||ev.tool||''} ${ev.reason||''}`;$('timeline').prepend(line);refresh()});
   es.addEventListener('reset',()=>{$('timeline').innerHTML='';refresh()})}
-boot();setInterval(refresh,3000);
+boot();setInterval(refresh,3000);watch();setInterval(watch,4000);
 </script>
 </body>
 </html>
