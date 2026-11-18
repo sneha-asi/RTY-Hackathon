@@ -115,3 +115,11 @@ def test_model_never_sees_fixture_sensitive_values(shield):
     blob = json.dumps([v["result"] for v in shield.model_view]).lower()
     leaked = [p for p in planted if p.lower() in blob]
     assert leaked == []
+
+
+def test_receipt_cap_table_counts_from_ledger(shield):
+    from app import receipts
+    _setup(shield)
+    out = receipts.answer(shield, "Did any AI see my cap table today?")
+    assert out["released"] == 0 and out["withheld"] >= 1
+    assert out["answer"].startswith("Shield released the cap table 0 times and withheld it")

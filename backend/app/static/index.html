@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shield</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--text:#e8ebf1;--mute:#9aa3b2;--ok:#3ecf8e;--warn:#f5b74a;--bad:#ff5d5d;--info:#6aa8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line)}
+header h1{font-size:22px;margin:0}header .tag{color:var(--mute);font-size:14px}
+main{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;padding:16px 20px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.panel h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:0 0 10px}
+.counters{display:flex;gap:10px;flex-wrap:wrap;padding:12px 20px 0}
+.counter{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:150px}
+.counter b{display:block;font-size:30px}.counter span{color:var(--mute);font-size:13px}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.state{font-weight:700;font-size:18px}.VERIFIED{color:var(--ok)}.BLOCKED,.FAILED{color:var(--bad)}.UNVERIFIED,.VERIFICATION_PENDING{color:var(--warn)}.AWAITING_APPROVAL{color:var(--info)}
+.check{display:grid;grid-template-columns:90px 24px 1fr;gap:6px;padding:3px 0;font-size:15px}
+.pass{color:var(--ok)}.fail{color:var(--bad)}.warn{color:var(--warn)}.pending{color:var(--mute)}
+.payload{background:#0b0d11;border-radius:8px;padding:10px;margin:8px 0;font-size:14px;white-space:pre-wrap}
+button{background:var(--info);color:#071225;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:15px;cursor:pointer}
+button.secondary{background:#2b313d;color:var(--text)}
+input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:15px;width:100%}
+.item{border-left:3px solid var(--line);padding:4px 10px;margin:6px 0;font-size:15px}.item.q{border-color:var(--bad)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute)}
+.timeline{max-height:320px;overflow:auto;font-size:13px}
+.banner{background:#3a1416;border:1px solid var(--bad);color:#ffd5d5;border-radius:8px;padding:8px 10px;margin:6px 0}
+.withheld{color:var(--mute);font-size:14px}
+#login{max-width:380px;margin:60px auto}
+</style>
+</head>
+<body>
+<header><h1>🛡 Shield</h1><span class="tag">The AI proposes. The code decides. Nothing is done until it's proven.</span><span class="tag" id="backend"></span></header>
+<div id="login" class="panel" hidden>
+  <h2>Owner login</h2>
+  <p class="withheld">Only you can approve. The assistant never holds this.</p>
+  <input id="secret" type="password" placeholder="Shield secret"><br><br><button onclick="login()">Log in</button>
+</div>
+<div id="app" hidden>
+  <div class="counters">
+    <div class="counter"><b id="c-sens">0</b><span>sensitive values the AI received</span></div>
+    <div class="counter"><b id="c-q">0</b><span>items quarantined</span></div>
+    <div class="counter"><b id="c-b">0</b><span>proposals blocked</span></div>
+    <div class="counter"><b id="c-v">0</b><span>actions verified</span></div>
+  </div>
+  <main>
+    <section class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></section>
+    <section>
+      <div class="panel"><h2>What the AI received</h2><div id="seen"><p class="withheld">Nothing yet.</p></div></div><br>
+      <div class="panel"><h2>Ask Shield</h2>
+        <input id="q" value="Did any AI see my cap table today?" onkeydown="if(event.key==='Enter')ask()"><br><br>
+        <button onclick="ask()">Ask</button><p id="answer" style="font-size:18px"></p></div><br>
+      <div class="panel"><h2>Timeline</h2><div id="timeline" class="timeline mono"></div></div>
+    </section>
+  </main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon={pass:'✔',fail:'✘',warn:'⚠',pending:'·'};
+async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:$('secret').value})});if(r.ok)boot();else alert('Wrong secret')}
+async function act(id,kind,seal){const r=await fetch(`/api/actions/${id}/${kind}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seal})});if(!r.ok)alert((await r.json()).detail);refresh()}
+async function ask(){const r=await fetch('/api/receipts?q='+encodeURIComponent($('q').value));$('answer').textContent=(await r.json()).answer}
+function renderAction(a){
+  const checks=a.checks.map(c=>`<div class="check"><b>${c.name}</b><span class="${c.status}">${icon[c.status]}</span><span>${esc(c.detail)}</span></div>`).join('');
+  const p=a.payload?`<div class="payload"><b>To:</b> ${esc(a.payload.to.join(', '))}\n<b>Subject:</b> ${esc(a.payload.subject)}\n<b>Attachment:</b> ${esc(a.payload.file_name)} · sha256 ${esc(a.payload.attachment_sha256.slice(0,16))}…\n\n${esc(a.payload.body)}</div><div class="mono">seal ${esc((a.seal||'').slice(0,16))}… · request ${esc(a.args.request)}</div>`:'';
+  const btn=a.state==='AWAITING_APPROVAL'?`<br><button onclick="act('${a.id}','approve','${a.seal}')">Approve exactly this</button> <button class="secondary" onclick="act('${a.id}','reject')">Reject</button>`:'';
+  return `<div class="card"><div class="state ${a.state}">${a.state.replace('_',' ')}</div><p>${esc(a.status_text)}</p>${checks}${p}${btn}</div>`}
+function renderSeen(v){
+  const r=v.result;let body='';
+  if(r.items){body=r.items.map(i=>i.status==='quarantined'?`<div class="banner">QUARANTINED · ${esc(i.sender)} · ${esc(i.reason)}</div>`:`<div class="item"><b>${esc(i.handle)}</b> ${esc(i.summary)}</div>`).join('');
+    const w=Object.entries(r.withheld||{}).map(([k,n])=>`${k} ${n}`).join(' · ');if(w)body+=`<div class="withheld">withheld: ${esc(w)}</div>`}
+  else if(r.files){body=r.files.map(f=>`<div class="item"><b>${esc(f.handle)}</b> ${esc(f.category)} v${f.version}${f.latest?' (latest)':''}${f.requires_nda?' · NDA':''}</div>`).join('')}
+  else if(r.error){body=`<div class="banner">${esc(r.error)}</div>`}
+  else{body=`<div class="mono">${esc(JSON.stringify(r).slice(0,220))}</div>`}
+  return `<div class="card"><div class="mono">${esc(v.tool)} · sensitive values: <b class="${v.sensitive_values?'fail':'pass'}">${v.sensitive_values}</b></div>${body}</div>`}
+async function refresh(){
+  const s=await (await fetch('/api/state')).json();
+  if(!s.authed){$('login').hidden=false;$('app').hidden=true;return}
+  $('login').hidden=true;$('app').hidden=false;$('backend').textContent='mail: '+s.mail_backend;
+  $('c-sens').textContent=s.counters.sensitive_values_exposed;$('c-q').textContent=s.counters.quarantined;$('c-b').textContent=s.counters.blocked;$('c-v').textContent=s.counters.verified;
+  $('actions').innerHTML=s.actions.length?s.actions.map(renderAction).join(''):'<p class="withheld">No proposals yet.</p>';
+  $('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
+let es;function boot(){refresh();if(es)es.close();es=new EventSource('/api/events');
+  es.addEventListener('ledger',e=>{const ev=JSON.parse(e.data);const line=document.createElement('div');
+    line.textContent=`${ev.ts.slice(11,19)} ${ev.kind} ${ev.action_id||''} ${ev.to||ev.purpose||ev.tool||''} ${ev.reason||''}`;$('timeline').prepend(line);refresh()});
+  es.addEventListener('reset',()=>{$('timeline').innerHTML='';refresh()})}
+boot();setInterval(refresh,3000);
+</script>
+</body>
+</html>
