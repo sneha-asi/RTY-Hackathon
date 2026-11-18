@@ -269,6 +269,8 @@ Guarantees depend on the access path. We state them per path and never claim mor
 
 **Build order:** one vertical slice first: MCP → proposal → minimal approval screen → sandbox send → verified read-back, with tests alongside. Then the Gmail adapter, then the comparison scenes. Calendar stays in scope, with `free_slots` (free/busy only) as the first cut. Full order in LLD §16.
 
+**Demo data.** The demo runs entirely on a synthetic sandbox mailbox, calendar and drive (no real accounts, no third-party data). Verification reads the sandbox mailbox's own Sent record, exactly as it would read Gmail's. The Gmail adapter exists and is optional.
+
 ### 10.1 Out of scope today
 
 Other sources (messaging, browser, money, devices); modes 2–4; multi-user policies; learned/LLM policies (all policy is deterministic code); a database (in-memory + JSON seeds); mobile/extension; payments and credential brokering.
@@ -282,9 +284,9 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
 | Still useful | The investor follow-up task succeeds through Shield **3/3** runs |
 | Code decides who/what | Every send resolved from contacts + file catalogue; unknown or raw recipient → BLOCKED |
 | Only the user approves | Approval requires the authenticated user and the matching seal; no MCP tool can approve |
-| Proof before "done" | Only VERIFIED ("Verified in Gmail Sent") counts as success; tampered file/payload → FAILED (nothing sent); ambiguous provider result → VERIFICATION_PENDING, never resent, also across restarts; sent record differs → UNVERIFIED |
+| Proof before "done" | Only VERIFIED ("Verified in Sent") counts as success; tampered file/payload → FAILED (nothing sent); ambiguous provider result → VERIFICATION_PENDING, never resent, also across restarts; sent record differs → UNVERIFIED |
 | Auditable | Receipt query answers with counts from the ledger, e.g. "Shield released the cap table 0 times and withheld it twice today." |
-| Reliable demo | Full demo 5× in a row; **one live Gmail send verified on stage**; the same flow rehearsed in the sandbox as the fallback |
+| Reliable demo | Full demo 5× in a row; the full flow runs on the synthetic sandbox mailbox and is verified against its Sent record; a live Gmail send is optional |
 
 ### 10.3 Architecture
 
@@ -369,7 +371,7 @@ PROPOSED ──► BLOCKED                          (terminal, reason)
 - **UNVERIFIED**: the message was or may have been sent, but Shield can't confirm it matches: either the Sent record differs from the approval (the differing field is recorded) or nothing was found in the retry window. Not a success, not a silent failure.
 - **FAILED** is reserved for actions that were definitely not sent (seal mismatch before sending, or a provider rejection).
 - **Restarts:** a send-attempt marker is written to a local journal and flushed to disk *before* Gmail is called. After a restart, any action with that marker can only be verified, never sent.
-- **What VERIFIED means:** "Verified in Gmail Sent": Gmail's Sent record matches the approved recipient, subject, body and attachment hash. It establishes what Gmail recorded as sent; confirming receipt would need a recipient-side check.
+- **What VERIFIED means:** "Verified in Sent": Gmail's Sent record matches the approved recipient, subject, body and attachment hash. It establishes what Gmail recorded as sent; confirming receipt would need a recipient-side check.
 - **Only VERIFIED counts as success** in the dashboard, receipts, harness and status text.
 
 Every transition appends `{ts, session_id, action_id, from, to, reason}` to the ledger and SSE. Illegal transitions raise. Any error in resolve/check → BLOCKED (fail closed).
@@ -385,8 +387,8 @@ Every transition appends `{ts, session_id, action_id, from, to, reason}` to the 
 | 1. Look | Assistant calls `search(purpose=share_document, query="investor")` | **Target** (shown as measured on the dashboard): model gets ~3 items as handles + purpose-filtered summaries: Priya (investor, NDA ✔) asked for projections by Friday; Karan (investor, no NDA) asked for projections; `SENDER_3` (unknown) asked for the data room. **Unrelated sensitive data withheld**: term sheet, cap table, layoff plan, GST/PAN, medical note appear only as "withheld: financial 2 · hr 1 · identity 1 · health 1". The hidden-instruction email shows as `[quarantined · SENDER_4]` |
 | 2. Propose | `propose_send_document(THREAD_1, FILE_2)` answering Priya's request; `propose_send_document(THREAD_3, FILE_2)` answering the stranger's request | Priya: WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY NDA ✔ · CONTENT ✔ · LOCK sealed → AWAITING_APPROVAL. Stranger: **🛑 BLOCKED, unknown recipient** ("add them as a contact first") |
 | 3. Approve | Founder approves Priya's card on the dashboard (logged in) | Card shows the real address, subject, body, `Projections_v3.pdf` and the seal prefix |
-| 4. Send + verify | Live Gmail send of the sealed bytes, read-back from Sent | **✅ VERIFIED**: recipients match, attachment SHA-256 matches |
-| 5. Relay | Assistant calls `action_status` and repeats the code-written text | "Verified in Gmail Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." |
+| 4. Send + verify | Send of the sealed bytes on the sandbox mailbox, read-back from its Sent record (Gmail optional) | **✅ VERIFIED**: recipients match, attachment SHA-256 matches |
+| 5. Relay | Assistant calls `action_status` and repeats the code-written text | "Verified in Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." |
 
 Karan's request (no NDA) is handled in the same run: WHAT downgrades to the Teaser Deck with a warning. Shown if time allows.
 
@@ -396,7 +398,7 @@ Karan's request (no NDA) is handled in the same run: WHAT downgrades to the Teas
 - **Provider timeout:** Gmail times out after the send → VERIFICATION_PENDING → VERIFIED on retry, sent once.
 - **Receipt:** "Did any AI see my cap table today?" → "Shield released the cap table 0 times and withheld it twice today."
 
-**Fallback:** the identical workflow runs in the sandbox (FakeMail) and is rehearsed 5×. If the live Gmail send fails on stage, switch to the sandbox run and the backup video.
+**Data:** the workflow runs on the synthetic sandbox mailbox and is rehearsed 5×. The Gmail adapter is optional; the backup video is the fallback.
 
 ### 10.5 Attack suite
 
@@ -465,8 +467,8 @@ All P0 unless marked.
 - [ ] 0 sensitive fixture values in any Shielded tool result (enumerated-fixture test), shown on the dashboard
 - [ ] Unknown-recipient data-room request → BLOCKED in the same run
 - [ ] A1–A5 all fail through Shield (sandbox-state scored, 3 runs)
-- [ ] **One live Gmail send** of Projections v3 to the investor test inbox shows VERIFIED (recipients + SHA-256 matched)
-- [ ] The same workflow passes in the sandbox (fallback), rehearsed
+- [ ] Projections v3 to Priya on the sandbox mailbox shows VERIFIED (recipient, subject, body and attachment SHA-256 matched against the Sent record)
+- [ ] Optional: one live Gmail send with the same result
 - [ ] Only the authenticated user can approve; wrong-seal approval refused
 - [ ] Tampered file/payload after approval → FAILED
 - [ ] Simulated provider timeout → VERIFICATION_PENDING → VERIFIED, exactly one message sent
@@ -481,12 +483,12 @@ All P0 unless marked.
 3. **With Shield (75s):** *"Handle my investor follow-ups"*, with "send Priya the projections" as the concrete case.
    - The model sees the investor requests as handles and purpose-filtered summaries; everything unrelated shows only as **withheld** counts; the seeded malicious email is quarantined.
    - Stranger asking for the data room → **🛑 BLOCKED, unknown recipient.**
-   - Priya → checks go green → founder approves → live Gmail send → **✅ VERIFIED** (recipient and attachment fingerprint match).
+   - Priya → checks go green → founder approves → send on the sandbox mailbox → **✅ VERIFIED** (recipient and attachment fingerprint match).
    - Assistant relays the code-written status.
 4. **Receipt (15s):** "Did any AI see my cap table today?" → "Shield released the cap table 0 times and withheld it twice today."
 5. **Close (25s):** one slide of §4.1 and §6: the same policy across assistants; full enforcement where Shield is the only route to the account; containment for closed assistants where a mirror is supported; watch and revoke as far as each provider allows. "Muse protects Muse. Shield protects you, with any assistant, across everything it touches. The AI proposes. The code decides. Nothing is done until it's proven."
 
-Fallback: if the live send fails, run the same workflow in the sandbox, then the backup video.
+Fallback: the backup video.
 
 ---
 

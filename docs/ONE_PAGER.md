@@ -33,7 +33,7 @@ The executive enables a standing policy once (M0: *investor follow-ups*). The sa
 | I4 | Proposals are bound to the request | `propose_send_document(request_handle, file_handle)`. Shield resolves the recipient from the request and checks the file fits the request and the policy |
 | I5 | No outbound channel in model text | The assistant's note is checked for links, images, identifiers (addresses, handles) and sensitive patterns (PAN, card, API key, amounts); any hit blocks the proposal |
 | I6 | Executive approves the exact message | M0 sends to **one To recipient** (Cc/Bcc on the roadmap). Shield seals the recipient, the exact message bytes and the attachment hash, and sends the same bytes it checked |
-| I7 | Done is a provider fact | Only **Verified in Gmail Sent** counts. Uncertain delivery shows VERIFICATION_PENDING and is never resent, even after a restart. Sent but the record differs, or still unconfirmed → UNVERIFIED. FAILED means definitely not sent |
+| I7 | Done is a provider fact | Only **Verified in Sent** counts. Uncertain delivery shows VERIFICATION_PENDING and is never resent, even after a restart. Sent but the record differs, or still unconfirmed → UNVERIFIED. FAILED means definitely not sent |
 | I8 | Decisions recorded without content | Receipts: "Shield released the cap table 0 times and withheld it once today." |
 | I9 | Fail closed | Any error blocks or withholds |
 | I10 | Claims follow the access path | See below |
@@ -47,6 +47,8 @@ The executive enables a standing policy once (M0: *investor follow-ups*). The sa
 
 ## The demo: one request, one approval
 
+**Demo data.** The demo runs entirely on a synthetic sandbox mailbox, calendar and drive (no real accounts, no third-party data). Verification reads the sandbox mailbox's own Sent record, exactly as it would read Gmail's. The Gmail adapter exists and is optional.
+
 The executive types one request in the assistant: *"Handle my investor follow-ups."* Preparation runs with no interruptions:
 
 ```
@@ -56,7 +58,7 @@ propose_send_document(THREAD_2, FILE_2)     Karan (investor, no NDA) → teaser 
 propose_send_document(THREAD_3, FILE_2)     unknown sender, data room → 🛑 BLOCKED
 ```
 
-On stage, one approval for Priya's send: the executive sees the exact recipient, subject, body and attachment, approves, and Shield shows **✅ Verified in Gmail Sent**. That means Gmail's Sent record matched the approved recipient, subject, body and attachment SHA-256.
+On stage, one approval for Priya's send: the executive sees the exact recipient, subject, body and attachment, approves, and Shield shows **✅ Verified in Sent**. That means Gmail's Sent record matched the approved recipient, subject, body and attachment SHA-256.
 
 What the dashboard reports, kept separate:
 
@@ -67,10 +69,10 @@ What the dashboard reports, kept separate:
 
 ## Build status
 
-Done and tested on the sandbox mailbox (29 tests): request-bound proposals, the five checks, exact-message seal, owner-only approval, no-resend with a durable journal, `VERIFICATION_PENDING`/`UNVERIFIED`, separate MCP listener, receipts, owner console. Remaining: one live Gmail send, the Direct-vs-Shielded comparison, rehearsal.
+Done and tested on the sandbox mailbox (102 tests): request-bound proposals, the five checks, exact-message seal, owner-only approval, no-resend with a durable journal, `VERIFICATION_PENDING`/`UNVERIFIED`, separate MCP listener, receipts, owner console. Also done: the Direct-vs-Shielded comparison (measured). Remaining: rehearsal and the backup video. A live Gmail send is optional.
 
 ## Why it scores
 
-- **Working product:** one request in the assistant, one approval, a verified send.
+- **Working product:** one request in the assistant, one approval, a verified send on the synthetic sandbox mailbox.
 - **Problem insight:** executives hold sensitive records beside routine work, and their messages carry authority; vendor controls are self-audited and per assistant.
 - **Depth:** the demo validates the core enforcement path, and the test suite checks the M0 invariants.

@@ -128,7 +128,7 @@ See [RULES.md](RULES.md) for the full list.
   - **Reads:** the assistant gets only handles (`THREAD_1`, `FILE_2`) and summaries that Shield writes itself, never email text, addresses or file contents. Unrelated sensitive mail appears only as withheld counts. Hidden-instruction emails are quarantined.
   - **Actions:** there is no send tool. `propose_send_document(THREAD_1, FILE_2)` answers *that request*: Shield takes the recipient from the request and checks that the file matches what was asked for.
   - **Checks and approval:** five checks run (WHO, WHAT, POLICY, CONTENT, LOCK), then Shield seals the exact message bytes. The founder approves that exact message in a local owner console.
-  - **Send and verify:** Shield sends the same bytes it checked and looks the message up in the Sent folder by its sealed Message-ID. Only **Verified in Gmail Sent** counts as success.
+  - **Send and verify:** Shield sends the same bytes it checked and looks the message up in the Sent folder by its sealed Message-ID. Only **Verified in Sent** counts as success.
 - **The hardest part:** making "done" trustworthy and at-most-once.
   - Approval binds to a hash of the exact MIME bytes and the attachment, so any change after approval fails before anything is sent.
   - A send-attempt marker is flushed to a local journal before the provider call. A timeout becomes `VERIFICATION_PENDING` and is only ever re-verified, never resent, even after a restart.

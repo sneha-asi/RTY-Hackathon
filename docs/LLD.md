@@ -589,11 +589,11 @@ Written by code from state:
 | REJECTED | "You rejected this. Nothing was sent." |
 | EXECUTING | "Sending now." |
 | VERIFICATION_PENDING | "The email may have been sent. Shield is checking your Sent folder and will not send it again." |
-| VERIFIED | "Verified in Gmail Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." (sandbox: "Verified in Sent (sandbox)") |
+| VERIFIED | "Verified in Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." (sandbox: "Verified in Sent (sandbox)") |
 | FAILED | "Not sent: changed after approval: attachment." / "Not sent: 400 invalid." |
-| UNVERIFIED | "Sent, but the Gmail Sent record differs from what you approved ({field}). Not counted as done." / "May have been sent, but Shield could not confirm it in Gmail Sent. It will not be resent. Not counted as done." |
+| UNVERIFIED | "Sent, but the Sent record differs from what you approved ({field}). Not counted as done." / "May have been sent, but Shield could not confirm it in Sent. It will not be resent. Not counted as done." |
 
-The status text may contain the recipient's **name**, never an address. Only VERIFIED text uses the word "Verified". A Gmail Sent match establishes what Gmail recorded as sent; confirming receipt would need a recipient-side check.
+The status text may contain the recipient's **name**, never an address. Only VERIFIED text uses the word "Verified". A Sent-record match establishes what the mailbox recorded as sent; confirming receipt would need a recipient-side check.
 
 ## 6. Executor (`executor.py`)
 
@@ -840,13 +840,13 @@ External clients have in-memory fakes with error injection (`FakeMail` with `fai
 | **1** | **Vertical slice:** seed (contacts, files, Priya + stranger + 2 sensitive emails) → handles → `search(share_document)` with summaries → `propose_send_document` with WHO/WHAT/POLICY/CONTENT/LOCK → minimal approval page (login, card, Approve with seal) → FakeMail `send_raw` → `find_sent` read-back → VERIFIED. Exposed over **MCP**, with Claude driving it | Claude completes "send Priya the projections" through MCP on the sandbox; the stranger is BLOCKED; `test_seal`, `test_state_machine`, `test_approval_auth`, `test_verifier` green |
 | 2 | VERIFICATION_PENDING + retry + no-resend; tamper → FAILED | `test_verification_pending`, `test_lock` green |
 | 3 | Full seed (15 emails, events, A1–A5) + cleaner + labels + fixture-enumerated privacy test | A1–A3 quarantined; `test_guarantees` green with measured numbers |
-| 4 | **GmailMail adapter** (one live send) | Real email lands, found by Message-ID, VERIFIED |
+| 4 | GmailMail adapter (optional) | Real email found by Message-ID, VERIFIED |
 | 5 | Ledger receipts + SSE + dashboard panels (exposure, action card, timeline) | Cap-table receipt correct; readable from the back |
 | 6 | Comparison scenes: Direct vs Shielded, sensitive values exposed + task completed, as measured | Numbers on the dashboard |
 | 7 | Calendar, first cut: `free_slots` (free/busy only) | Returns slots; no titles or descriptions |
 | 8 | `propose_event`, `propose_reply`, harness 3× runs | If time allows |
 
-If time runs short, cut from the bottom. The live Gmail send stays in scope; FakeMail is the rehearsed fallback, not a substitute.
+If time runs short, cut from the bottom. The demo runs on the synthetic sandbox mailbox; the Gmail adapter is optional.
 
 ## 17. End-to-end walkthroughs
 
@@ -874,7 +874,7 @@ If time runs short, cut from the bottom. The live Gmail send stays in scope; Fak
       seal == payload_hash ✔ → APPROVED → read file once → hashes ✔ → EXECUTING
       send_attempted = true → GmailMail.send_raw(exact bytes)
 9.  [verifier] find_sent(Message-ID) → recipients ✔ subject ✔ attachment sha ✔ → VERIFIED
-10. Assistant → action_status(id) → "Verified in Gmail Sent: Projections v3 to Priya Rao; …"
+10. Assistant → action_status(id) → "Verified in Sent: Projections v3 to Priya Rao; …"
 11. User → receipts "Did any AI see my cap table today?"
       → "Shield released the cap table 0 times and withheld it twice today."
 ```

@@ -153,7 +153,7 @@ propose_send_document(THREAD_1, FILE_2, note)     # the request handle, not a re
   → AWAITING_APPROVAL → dashboard card
 user approve(seal)
   → re-read once → hash checks → send those bytes          (send_attempted = true first)
-  → verifier: find by Message-ID in Gmail Sent → VERIFIED | UNVERIFIED (record differs) | VERIFICATION_PENDING → retry → VERIFIED | UNVERIFIED
+  → verifier: find by Message-ID in the mailbox's Sent record → VERIFIED | UNVERIFIED (record differs) | VERIFICATION_PENDING → retry → VERIFIED | UNVERIFIED
 ```
 
 **Action lifecycle**
@@ -196,9 +196,9 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 | 1. Vertical slice: MCP → request-bound proposal → owner console approval → FakeMail → read-back → VERIFIED | `test_slice` (18) | **Done** |
 | 2. VERIFICATION_PENDING, no-resend, durable journal + restart recovery, tamper → FAILED, mismatch → UNVERIFIED | `test_slice`, `test_policy_and_boundaries` | **Done** |
 | 3. Seed (15 emails, events, A1/A2/A5 hidden-text attacks, A4 stranger), cleaner, detectors, fixture privacy test | `test_policy_and_boundaries` | **Done** (detector unit tests pending) |
-| 4. Gmail adapter, one live send | manual | Code done; needs `token.json` |
+| 4. Gmail adapter | manual | Code done; optional (demo uses the sandbox mailbox) |
 | 5. Receipts, SSE, owner console | `test_receipt_cap_table_counts_from_ledger` | **Done** |
-| 6. Comparison scenes (Direct vs Shielded) | — | Not started |
+| 6. Comparison (Direct vs Shielded) | `test_harness_scoring` | **Done**: scripted runner measures 21 planted values exposed without Shield, 0 with |
 | 7. Calendar first cut (free/busy) | covered in privacy test | **Done** |
 
-29 tests passing.
+102 tests passing.

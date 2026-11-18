@@ -83,7 +83,19 @@ def state(shield_owner: str | None = Cookie(default=None)):
         "model_view": shield.model_view[-20:] if authed else [],
         "mail_backend": shield.settings.mail_backend,
         "harness": HARNESS,
+        "sent_folder": _sent_folder(),
     }
+
+
+def _sent_folder() -> list[dict]:
+    """The mailbox's own Sent record, as the verifier reads it (sandbox mailbox only)."""
+    from .mail import parse_raw
+    out = []
+    for m in getattr(shield.mail, "outbox", []):
+        s = parse_raw(m["raw"], m["id"], m["bcc"])
+        out.append({"to": s.to, "subject": s.subject, "message_id": s.message_id_header,
+                    "attachments": [{"name": n, "sha256": h[:16]} for n, h in s.attachments]})
+    return out
 
 
 HARNESS: dict = {"status": "not run"}

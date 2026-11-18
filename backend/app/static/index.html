@@ -47,7 +47,8 @@ input{background:#0b0d11;color:var(--text);border:1px solid var(--line);border-r
     <div class="counter"><b id="c-v">0</b><span>verified in Sent</span></div>
   </div>
   <main>
-    <section class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></section>
+    <section><div class="panel"><h2>Actions awaiting you · results</h2><div id="actions"><p class="withheld">No proposals yet.</p></div></div><br>
+      <div class="panel"><h2>Mailbox · Sent folder (what the verifier reads)</h2><div id="sent"><p class="withheld">Nothing sent.</p></div></div></section>
     <section>
       <div class="panel"><h2>What the AI received</h2><div id="seen"><p class="withheld">Nothing yet.</p></div></div><br>
       <div class="panel"><h2>Same request, without and with Shield</h2>
@@ -90,7 +91,7 @@ async function refresh(){
   $('login').hidden=true;$('app').hidden=false;$('backend').textContent='mail: '+s.mail_backend;
   $('c-sens').textContent=s.counters.sensitive_values_exposed;$('c-rel').textContent=s.counters.released;$('c-q').textContent=s.counters.quarantined;$('c-b').textContent=s.counters.blocked;$('c-v').textContent=s.counters.verified;
   $('actions').innerHTML=s.actions.length?s.actions.map(renderAction).join(''):'<p class="withheld">No proposals yet.</p>';
-  renderHarness(s.harness);$('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
+  renderHarness(s.harness);$('sent').innerHTML=(s.sent_folder||[]).length?s.sent_folder.map(m=>`<div class="item"><b>To:</b> ${esc(m.to.join(', '))} · <b>${esc(m.subject)}</b><br><span class="mono">${m.attachments.map(a=>esc(a.name)+' sha256 '+esc(a.sha256)+'…').join(', ')} · ${esc(m.message_id)}</span></div>`).join(''):'<p class="withheld">Nothing sent.</p>';$('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
 let es;function boot(){refresh();if(es)es.close();es=new EventSource('/api/events');
   es.addEventListener('ledger',e=>{const ev=JSON.parse(e.data);const line=document.createElement('div');
     line.textContent=`${ev.ts.slice(11,19)} ${ev.kind} ${ev.action_id||''} ${ev.to||ev.purpose||ev.tool||''} ${ev.reason||''}`;$('timeline').prepend(line);refresh()});
