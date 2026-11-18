@@ -1,0 +1,5 @@
+{"name":"<<FOUNDER_FIRST_NAME>>","company":"<<COMPANY>>","registered_numbers":["<<FOUNDER_PHONE_E164>>"],
+ "pin":"<<FOUNDER_PIN>>","sender_email":"<<FOUNDER_TEST_GMAIL>>",
+ "policies":{"send_document":{"requires_verified_caller":true,"known_recipient_only":true},
+             "intro":{"requires_verified_caller":true,"double_opt_in":true},
+             "follow_up":{"requires_verified_caller":true}}}

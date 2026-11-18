@@ -24,3 +24,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Axon Voice: Google OAuth material never goes in git
+token.json
+credentials.json
+.pytest_cache/

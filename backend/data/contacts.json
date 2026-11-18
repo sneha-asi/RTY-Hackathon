@@ -1,0 +1,4 @@
+[{"id":"c1","name":"Priya Rao","org":"Northbeam Ventures","email":"<<INVESTOR_TEST_GMAIL>>","role":"investor","nda":true},
+ {"id":"c2","name":"Riya Shah","org":"Acme","email":"<<SECOND_TEST_EMAIL>>","role":"customer","nda":false},
+ {"id":"c3","name":"Ramesh Iyer","org":"Kirana Cloud","email":"<<THIRD_TEST_EMAIL>>","role":"customer","nda":false},
+ {"id":"c4","name":"Karan Mehta","org":"Angel","email":"<<FOURTH_TEST_EMAIL>>","role":"investor","nda":false}]
