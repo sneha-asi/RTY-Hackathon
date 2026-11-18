@@ -5,8 +5,8 @@ remove everything afterwards with scripts/cleanup_demo_mail.py.
 layoff plan, GST/PAN, medical note, cap-table board prep, and the hidden-instruction attacks) into a Gmail TEST
 account that Instinct connects to directly. All data is synthetic. Never run this against a personal account.
 
-  python scripts/gmail_token.py --out token_unprotected.json --scopes insert   (log in as the demo executive inbox)
-  python scripts/seed_unprotected_inbox.py --token token_unprotected.json [--dry-run]"""
+  python demo/scripts/gmail_token.py --out token_unprotected.json --scopes insert   (log in as the demo executive inbox)
+  python demo/scripts/seed_unprotected_inbox.py --token token_unprotected.json [--dry-run]"""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
 import os as _os
 import sys as _sys

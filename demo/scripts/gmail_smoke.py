@@ -1,6 +1,6 @@
 """Live rehearsal of the protected send with real Gmail test accounts (sends ONE real email).
 
-  SHIELD_MAIL=gmail python scripts/gmail_smoke.py --yes
+  SHIELD_MAIL=gmail python demo/scripts/gmail_smoke.py --yes
 
 Uses the same path as the demo: intake "REQ_7 FILE_2" → checks → seal → approve → send from the sender test account
 (GMAIL_TOKEN) to INVESTOR_TEST_GMAIL → verify against Gmail Sent."""

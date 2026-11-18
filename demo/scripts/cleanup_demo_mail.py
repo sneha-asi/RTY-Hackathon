@@ -1,6 +1,6 @@
 """Move every message carrying the demo label (default "Shield demo") to Trash, then delete the label.
 
-  python scripts/cleanup_demo_mail.py --token token_watch.json [--label "Shield demo"]"""
+  python demo/scripts/cleanup_demo_mail.py --token token_watch.json [--label "Shield demo"]"""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
 import os as _os
 import sys as _sys

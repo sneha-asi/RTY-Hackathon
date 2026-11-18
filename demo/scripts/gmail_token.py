@@ -1,12 +1,12 @@
 """Create an OAuth token for one Gmail TEST account (run on your laptop; a browser opens).
 
   Sender account (only Shield uses it; the assistant never gets it):
-    python scripts/gmail_token.py --out token.json --scopes send,readonly
+    python demo/scripts/gmail_token.py --out token.json --scopes send,readonly
   Restricted demo inbox (the one Instinct can read), only to seed it:
-    python scripts/gmail_token.py --out token_restricted.json --scopes insert
+    python demo/scripts/gmail_token.py --out token_restricted.json --scopes insert
 
   Your own Gmail, for the before/after demo (runs only on your laptop; the token stays there):
-    python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
+    python demo/scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose
 
 Needs credentials.json (Google Cloud OAuth client, type Desktop) in backend/. Both files are git-ignored."""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.

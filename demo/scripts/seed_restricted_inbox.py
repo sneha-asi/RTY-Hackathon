@@ -1,7 +1,7 @@
 """Put Shield's safe publication (request IDs + eligible document IDs, no addresses, no contents) into the
 restricted demo inbox Instinct can read. Uses messages.insert, so nothing is sent and the sender account is not exposed.
 
-  python scripts/seed_restricted_inbox.py --token token_restricted.json [--dry-run]"""
+  python demo/scripts/seed_restricted_inbox.py --token token_restricted.json [--dry-run]"""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
 import os as _os
 import sys as _sys

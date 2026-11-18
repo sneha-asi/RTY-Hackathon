@@ -2,8 +2,8 @@
 "[Shield Demo] Priya — investor follow-up" with the safe summary, REQ_7 and FILE_2. No attachment, no destination
 address. On success Shield records the publication (with Gmail's message id as evidence) for the receipt.
 
-  python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose   (sign in as that Gmail)
-  python scripts/seed_demo_request.py --token token_watch.json [--request REQ_7] [--dry-run]"""
+  python demo/scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose   (sign in as that Gmail)
+  python demo/scripts/seed_demo_request.py --token token_watch.json [--request REQ_7] [--dry-run]"""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
 import os as _os
 import sys as _sys

@@ -1,5 +1,5 @@
 """A second, independent MCP client ("second-assistant") for the demo: it connects to the same Shield endpoint and
-gets the same policy, the same handles-only view and the same blocks as Claude. Usage: python scripts/second_assistant.py"""
+gets the same policy, the same handles-only view and the same blocks as Claude. Usage: python demo/scripts/second_assistant.py"""
 # Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
 import os as _os
 import sys as _sys
