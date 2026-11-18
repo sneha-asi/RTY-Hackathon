@@ -191,14 +191,15 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 ## 9. Implementation status
 
-| Slice (LLD §16) | Tests | Status |
-|---|---|---|
-| 1. Vertical slice: MCP → request-bound proposal → owner console approval → FakeMail → read-back → VERIFIED | `test_slice` (18) | **Done** |
-| 2. VERIFICATION_PENDING, no-resend, durable journal + restart recovery, tamper → FAILED, mismatch → UNVERIFIED | `test_slice`, `test_policy_and_boundaries` | **Done** |
-| 3. Seed (15 emails, events, A1/A2/A5 hidden-text attacks, A4 stranger), cleaner, detectors, fixture privacy test | `test_policy_and_boundaries` | **Done** (detector unit tests pending) |
-| 4. Gmail adapter | manual | Code done; optional (demo uses the sandbox mailbox) |
-| 5. Receipts, SSE, owner console | `test_receipt_cap_table_counts_from_ledger` | **Done** |
-| 6. Comparison (Direct vs Shielded) | `test_harness_scoring` | **Done**: scripted runner measures 21 planted values exposed without Shield, 0 with |
-| 7. Calendar first cut (free/busy) | covered in privacy test | **Done** |
+All on `main`; 113 tests (`cd backend && python -m pytest -q`).
 
-102 tests passing.
+| Slice (LLD §16) | Status |
+|---|---|
+| 1. MCP → request-bound proposal → owner console approval → sandbox mailbox → read-back → VERIFIED | **Done** |
+| 2. VERIFICATION_PENDING, no-resend with a durable journal and restart recovery, tamper → FAILED, mismatch → UNVERIFIED | **Done** |
+| 3. Seed (16 emails, 4 events, 6 files), cleaner, detectors, fail-closed summaries, A1–A5 attack suite, fixture privacy test | **Done** |
+| 4. Gmail adapter | Code done; optional (the demo uses the synthetic sandbox mailbox) |
+| 5. Ledger, receipts, SSE, owner console (policy and sole-path indicator, Sent folder) | **Done** |
+| 6. Direct-vs-Shielded comparison (scripted runner; model runner needs an API key) | **Done**: 21 planted values exposed without Shield, 0 with; task done in both |
+| 7. Calendar first cut (`free_slots`, free/busy only, policy-gated) | **Done** |
+| Tools: `search`, `read`, `list_files`, `free_slots`, `propose_send_document`, `propose_reply`, `action_status` | **Done** |

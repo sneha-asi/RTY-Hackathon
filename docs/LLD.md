@@ -678,8 +678,8 @@ read(purpose: str, thread: str) -> Release              # 1 item
 list_files(category: str = "") -> {files: [{handle, category, version, latest, requires_nda}], withheld}
 free_slots(start: str, end: str) -> {slots: [{start, end}]}
 propose_send_document(request: str, file: str, note: str = "") -> ActionView   # request = THREAD_n released in this session
-propose_reply(thread: str, text: str) -> ActionView
-propose_event(attendees: list[str], start: str, end: str, title: str) -> ActionView
+propose_reply(thread: str, text: str) -> ActionView   # thread released in this session; recipient from the thread; CONTENT-gated; no attachment
+# propose_event: roadmap (M0 has no event-creation tool, which also closes A1's action path)
 action_status(action_id: str) -> {action_id, state, status_text}
 ```
 
