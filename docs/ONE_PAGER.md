@@ -21,15 +21,17 @@ A layer the user owns that sits between AI assistants and **everything they can 
 
 ## Technical first principles: the invariants
 
+**One policy governs what the assistant learns during a task and what it may propose doing with that information.** The founder enables *investor follow-ups* once; the same policy decides what Shield releases and which proposals it accepts.
+
 | | Invariant | In M0 |
 |---|---|---|
 | I1 | Need-to-know at the interface | The model gets only handles (`CONTACT_1 · investor · NDA ✔`, `FILE_2 · projections · v3`), structured attributes and purpose-filtered summaries Shield writes. No email or document text passes through |
 | I2 | Untrusted content is data | The cleaner strips hidden text and quarantines the seeded malicious examples. It's a safeguard, not the guarantee |
-| I3 | No ambient authority | No send tool; only `propose_*` |
-| I4 | Code chooses targets | Handles resolve to the user's contacts and file catalogue; raw addresses are refused |
+| I3 | No ambient authority | The assistant can read (scoped) and propose; execution and approval stay outside it |
+| I4 | Proposals bound to the request | `propose_send_document(THREAD_1, FILE_2)`: the recipient comes from Priya's request; the file must match what she asked for; raw addresses refused |
 | I5 | No outbound channel in model text | No URLs, images, raw identifiers or sensitive values in the note |
 | I6 | User approves exact sealed payload | Recipients (To/Cc/Bcc), message bytes and attachment hash are sealed; Shield sends the same bytes it checked |
-| I7 | Done is a provider fact | Only VERIFIED counts; uncertain delivery shows VERIFICATION_PENDING and is never resent automatically; if still unconfirmed after ~2 min it shows UNVERIFIED ("may have been sent") |
+| I7 | Done is a provider fact | Only VERIFIED ("Verified in Gmail Sent") counts. Uncertain delivery shows VERIFICATION_PENDING and is never resent, even after a restart (durable journal). Sent but record differs, or unconfirmed after ~2 min → UNVERIFIED. FAILED means definitely not sent |
 | I8 | Decisions recorded without content | Receipts: "Shield released the cap table 0 times and withheld it twice today." |
 | I9 | Fail closed | Any error blocks or withholds |
 | I10 | Claims follow the access path | See below |
@@ -38,8 +40,8 @@ A layer the user owns that sits between AI assistants and **everything they can 
 
 | Assistant | How Shield reaches it |
 |---|---|
-| Instinct (closed, own login) | Contain via a mirror inbox; watch & revoke |
-| Muse (desktop agent) | Edge proxy; contain; watch & revoke |
+| Instinct (closed, own login) | Contain via a mirror inbox; watch & revoke (compatibility target, pending testing) |
+| Muse (desktop agent) | Edge proxy; contain; watch & revoke (compatibility target, pending testing) |
 | OpenClaw (user-run) | Enforce if its tools point at Shield; otherwise edge |
 
 Today's demo uses Claude over MCP to prove the mechanism end to end; these three are the roadmap.
@@ -48,7 +50,7 @@ Today's demo uses Claude over MCP to prove the mechanism end to end; these three
 
 | Access path | What we claim |
 |---|---|
-| Shield is the assistant's **only route** to the account (MCP connector) | Full enforcement: I1–I9 |
+| Shield is the assistant's **only route** to the account (MCP connector) | Full enforcement: I1–I9. Shown as sole path yes / no / unknown |
 | Closed assistant with a **supported mirror** | Containment: it sees only what Shield mirrors; only mirror sends are gated |
 | Any account | Monitoring and revocation, **as far as each provider exposes** |
 
@@ -58,10 +60,10 @@ The concrete case is **"send Priya the projections"**:
 
 ```
 search(purpose=share_document)         → investor requests as handles + summaries; the rest withheld
-propose_send_document(CONTACT_1, FILE_2)
+propose_send_document(THREAD_1, FILE_2)     # answers Priya's request
   → WHO ✔ Priya Rao · WHAT ✔ Projections v3 · POLICY ✔ NDA · CONTENT ✔ · LOCK 🔒
-propose_send_document(SENDER_3, FILE_2)   (stranger asking for the data room) → 🛑 BLOCKED
-user approves exact payload → live Gmail send → Shield reads the Sent record → ✅ VERIFIED
+propose_send_document(THREAD_3, FILE_2)     # stranger's data-room request → 🛑 BLOCKED
+founder approves the exact message → Gmail send → ✅ Verified in Gmail Sent
 ```
 
 - **Comparison:** same request, same model, Direct vs Shielded. We show **sensitive values exposed** and **task completed** for both, exactly as measured.

@@ -118,11 +118,34 @@ See [RULES.md](RULES.md) for the full list.
 
 ## Your project
 
-_Replace this section with your project README:_
-- **Team:**
-- **Track:**
-- **Problem:** who faces it and why it happens
-- **What we built:** the core workflow
-- **The hardest part:** how we solved it
+**Shield**: a user-owned trust layer between personal AI assistants and the accounts they can reach.
+
+- **Team:** Axon (Sneha, `sneha-asi`)
+- **Track:** `ai-agents`, Build for AI Agents
+- **Problem:** Executives, founders first, deal with a lot of sensitive information, much of it other people's: term sheets, cap tables, layoff plans, investor data. Assistants like Instinct, Muse and OpenClaw ask for access to everything, and each has gone wrong: Instinct emailed an investor unasked, OpenClaw mass-deleted an inbox, Muse shipped with a backdoor-grade zero-day. An assistant that combines private data, untrusted content and a way to act outward can be steered by anything it reads, and a model can't be made to reliably refuse. Vendors' own controls protect their own product and are audited by the vendor.
+- **What we built:** an MCP server the assistant connects to instead of Gmail.
+  - **One standing policy** (the founder enables "investor follow-ups" once) governs both what the assistant learns and what it may propose.
+  - **Reads:** the assistant gets only handles (`THREAD_1`, `FILE_2`) and summaries that Shield writes itself, never email text, addresses or file contents. Unrelated sensitive mail appears only as withheld counts. Hidden-instruction emails are quarantined.
+  - **Actions:** there is no send tool. `propose_send_document(THREAD_1, FILE_2)` answers *that request*: Shield takes the recipient from the request and checks that the file matches what was asked for.
+  - **Checks and approval:** five checks run (WHO, WHAT, POLICY, CONTENT, LOCK), then Shield seals the exact message bytes. The founder approves that exact message in a local owner console.
+  - **Send and verify:** Shield sends the same bytes it checked and looks the message up in the Sent folder by its sealed Message-ID. Only **Verified in Gmail Sent** counts as success.
+- **The hardest part:** making "done" trustworthy and at-most-once.
+  - Approval binds to a hash of the exact MIME bytes and the attachment, so any change after approval fails before anything is sent.
+  - A send-attempt marker is flushed to a local journal before the provider call. A timeout becomes `VERIFICATION_PENDING` and is only ever re-verified, never resent, even after a restart.
+  - A Sent record that differs from the approval is `UNVERIFIED` with the differing field. `FAILED` is reserved for messages that definitely weren't sent.
+  - The MCP listener is a separate app, so a tunnel to it can't reach approval or raw data.
+  - 29 tests cover the checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value ever reaches the model.
 - **How to run it:**
-- **Demo / screenshots:**
+  ```bash
+  cd backend && pip install -r requirements.txt && cp .env.example .env   # set SHIELD_USER_SECRET
+  python -m pytest -q        # 29 tests
+  python run.py              # owner console http://127.0.0.1:8000 · MCP http://127.0.0.1:8765/mcp
+  claude mcp add --transport http shield http://127.0.0.1:8765/mcp   # then ask: "Handle my investor follow-ups"
+  ```
+  Default is the sandbox mailbox. For a live send, set `SHIELD_MAIL=gmail` with a `token.json` (gmail.send + gmail.readonly) for the sender account.
+- **Demo:** "Handle my investor follow-ups." In order:
+  1. The assistant sees three requests as summaries; the cap table, layoff plan, PAN and medical note appear only as withheld counts; three hidden-instruction items are quarantined.
+  2. The stranger's data-room request → 🛑 BLOCKED (unknown recipient; not covered by the policy).
+  3. Priya's request → checks green → the founder approves the exact message → ✅ Verified in Sent.
+  4. "Did any AI see my cap table today?" → "Shield released the cap table 0 times and withheld it once today."
+- **Docs:** [docs/](docs/README.md) has the one-pager, PRD (first principles B1–B6, invariants I1–I10), HLD and LLD.

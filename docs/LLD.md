@@ -48,7 +48,13 @@ backend/
     tools.py         NEW   Shielded + Direct tool functions (shared by MCP and harness)
     mcp_server.py    NEW   FastMCP wrapping tools.py
     harness.py       NEW   Direct vs Shielded runs, scoring
-    main.py          NEW   FastAPI: REST, SSE, approvals, dev, mounts MCP at /mcp
+    main.py          NEW   owner console (FastAPI, 127.0.0.1): login, approval, state, SSE, receipts, dev; builds mcp_app
+    service.py       NEW   wires seed, broker, guard, ledger, journal; binds sessions to the standing policy
+    journal.py       NEW   durable send-attempt journal (fsync before provider call)
+    receipts.py      NEW   fixed-intent receipt queries from ledger counts
+    static/index.html NEW  owner console page
+  run.py             NEW   starts both listeners in one process: owner :8000 (127.0.0.1), MCP :8765/mcp
+  data/policy.json   NEW   standing policies (M0: investor_followups)
   data/              contacts.json, files.json (extend) + emails.json, events.json (new)
   files/             demo files (PDF/TXT); copied to a runtime dir at startup
   tests/
@@ -180,9 +186,9 @@ class State(str, Enum):
 TRANSITIONS = {
   State.PROPOSED:             {State.BLOCKED, State.AWAITING_APPROVAL},
   State.AWAITING_APPROVAL:    {State.APPROVED, State.REJECTED},
-  State.APPROVED:             {State.EXECUTING, State.FAILED},          # FAILED = seal mismatch, nothing sent
-  State.EXECUTING:            {State.VERIFIED, State.FAILED, State.VERIFICATION_PENDING},
-  State.VERIFICATION_PENDING: {State.VERIFIED, State.FAILED, State.UNVERIFIED},
+  State.APPROVED:             {State.EXECUTING, State.FAILED},          # FAILED = definitely not sent
+  State.EXECUTING:            {State.VERIFIED, State.FAILED, State.VERIFICATION_PENDING, State.UNVERIFIED},
+  State.VERIFICATION_PENDING: {State.VERIFIED, State.UNVERIFIED},        # never FAILED: the message may exist
 }
 TERMINAL = {State.BLOCKED, State.REJECTED, State.VERIFIED, State.FAILED, State.UNVERIFIED}
 SUCCESS = {State.VERIFIED}      # the only state any surface may call success
@@ -402,6 +408,24 @@ Session totals live on `ledger.sessions[session_id]`. Direct mode just measures.
 
 ## 5. Write path (`guard.py`)
 
+### 5.0 Standing policy (shared by read and write paths)
+
+`data/policy.json`, enabled by the founder once:
+
+```json
+{"investor_followups": {"enabled": true, "purposes": ["share_document", "schedule"],
+  "recipient_roles": ["investor"], "categories": ["projections", "teaser"],
+  "nda_fallback": "teaser", "never_share": ["secrets", "hr"], "approval": "always"}}
+```
+
+- **Session binding.** A new MCP session gets a `HandleRegistry` bound to the enabled policy.
+- **Read side.** `search` refuses a `purpose` outside `purposes` (the assistant can narrow, never widen). `share_document` releases document requests from `recipient_roles`, plus unknown senders so the block is visible. Each released request is recorded in the session: `THREAD_n → {item, requested category, sender handle}`.
+- **Write side.** `propose_send_document(request, file, note)`:
+  - The recipient is the request's sender. It must be a contact whose role is in `recipient_roles`.
+  - The file's category must equal the request's category, and that category must be in `categories`. The only substitute is `nda_fallback` when the contact has no NDA; a newer version of the same category replaces an older one.
+  - Requests from other sessions, contact handles and file handles are not requests → BLOCKED.
+
+
 ### 5.1 Pipeline
 
 ```python
@@ -542,10 +566,13 @@ def approve(action_id, user, seal_from_screen) -> Action:
 
 `raw` is the exact byte string whose hash was checked; `send_raw` transmits it unchanged (Gmail: `messages.send` with `raw=base64url(raw)`). Nothing is re-read or rebuilt between the check and the send.
 
+**Durable marker.** Before `send_raw`, `journal.attempt(action)` appends the action (ids, seal, Message-ID; no body bytes) to `runtime/send_journal.jsonl` and fsyncs. Terminal outcomes append `outcome`. On startup `guard.recover()` loads every attempt without an outcome as VERIFICATION_PENDING and schedules verification only. `approve` also refuses to send if the journal already holds an attempt for that action.
+
 **Never resend.** No code path calls `send_raw` when `a.send_attempted` is true. `approve` on any state other than `AWAITING_APPROVAL` returns the action unchanged, and there is no "retry send" endpoint; a user who wants to try again makes a new proposal, which gets a new seal and needs a new approval.
 
 **Verification retries.**
-- `verify_now_or_pending(a)` runs §7 once. A verdict of `ok` → VERIFIED. A definite mismatch → FAILED. "Not found yet" → VERIFICATION_PENDING plus `schedule_verify`.
+- `verify_now_or_pending(a)` runs §7 once. A verdict of `ok` → VERIFIED. A confirmed mismatch → **UNVERIFIED** with the differing field in `reason` (the message was sent, so FAILED would be wrong). "Not found yet" → VERIFICATION_PENDING plus `schedule_verify`.
+- **FAILED is reserved for definitely unsent actions**: seal or attachment mismatch before sending, or `DefinitelyNotSent` from the provider.
 - `schedule_verify(id)` runs a background thread with backoff of 1, 2, 4, 8, 15, 30 and 60 s (about 2 minutes in total). Each attempt calls §7 and increments `verify_attempts`.
 - If the message is still not found when the window closes → `UNVERIFIED` "may have been sent; could not confirm". Never → FAILED, because the message may exist.
 
@@ -562,11 +589,11 @@ Written by code from state:
 | REJECTED | "You rejected this. Nothing was sent." |
 | EXECUTING | "Sending now." |
 | VERIFICATION_PENDING | "The email may have been sent. Shield is checking your Sent folder and will not send it again." |
-| VERIFIED | "Sent and verified: Priya Rao received Projections v3 (fingerprint matched)." |
-| FAILED | "Not sent: the file changed after approval." / "Sent, but it doesn't match what you approved: {field}." |
-| UNVERIFIED | "May have been sent, but Shield could not confirm it. Check your Sent folder. Not counted as done." |
+| VERIFIED | "Verified in Gmail Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." (sandbox: "Verified in Sent (sandbox)") |
+| FAILED | "Not sent: changed after approval: attachment." / "Not sent: 400 invalid." |
+| UNVERIFIED | "Sent, but the Gmail Sent record differs from what you approved ({field}). Not counted as done." / "May have been sent, but Shield could not confirm it in Gmail Sent. It will not be resent. Not counted as done." |
 
-The status text may contain the recipient's **name**, never an address. Only VERIFIED text uses the words "sent and verified".
+The status text may contain the recipient's **name**, never an address. Only VERIFIED text uses the word "Verified". A Gmail Sent match establishes what Gmail recorded as sent; confirming receipt would need a recipient-side check.
 
 ## 6. Executor (`executor.py`)
 
@@ -604,6 +631,7 @@ def verify(mail, a) -> Verdict:            # "ok" | "mismatch" | "not_found"
     checks = {
       "recipients": norm_set(s.to + s.cc + s.bcc) == norm_set(a.payload.to + a.payload.cc + a.payload.bcc),
       "subject":    s.subject == a.payload.subject,
+      "body":       norm_body(s.body) == norm_body(a.payload.body),
       "attachment": (a.payload.file_id is None and not s.attachments) or
                     s.attachments == [(a.payload.file_name, a.payload.attachment_sha256)],
     }
@@ -632,7 +660,7 @@ Writes go to memory plus `runtime/ledger.jsonl` (git-ignored) for the backup vid
 | Intent | Trigger words | Answer built from |
 |---|---|---|
 | `did_ai_see(X)` | "did … see", "has … seen" + an X from {file categories, labels, contact names} | `release` events: items with label/category X released vs `request_denied`/withheld counts, by purpose |
-| `what_sent(today)` | "what … sent", "sent today" | VERIFIED/FAILED transitions |
+| `what_sent(today)` | "what … sent", "sent today" | VERIFIED actions; VERIFICATION_PENDING/UNVERIFIED listed as "not confirmed" |
 | `what_blocked(today)` | "blocked", "stopped" | BLOCKED transitions + quarantine events |
 
 Example: "Did any AI see my cap table today?" → X = `cap_table` →
@@ -642,14 +670,14 @@ Receipts state what Shield did, from ledger counts. They do not claim what an as
 
 ## 9. Tool surface (`tools.py`, wrapped by `mcp_server.py`)
 
-All Shielded tools take an implicit `session_id`. For MCP it comes from the `Mcp-Session-Id` header, falling back to `"default"`; the harness passes its own.
+All Shielded tools take an implicit `session_id`. For MCP it is `mcp:<Mcp-Session-Id>`; a call without that header is refused (there is **no shared default session**). Handles, released requests and `action_status` are all scoped to that session. The harness and tests pass their own ids. At session creation the session is bound to the founder's enabled standing policy (§5.0).
 
 ```text
 search(purpose: str, query: str = "") -> Release
 read(purpose: str, thread: str) -> Release              # 1 item
 list_files(category: str = "") -> {files: [{handle, category, version, latest, requires_nda}], withheld}
 free_slots(start: str, end: str) -> {slots: [{start, end}]}
-propose_send_document(recipient: str, file: str, note: str = "") -> ActionView
+propose_send_document(request: str, file: str, note: str = "") -> ActionView   # request = THREAD_n released in this session
 propose_reply(thread: str, text: str) -> ActionView
 propose_event(attendees: list[str], start: str, end: str, title: str) -> ActionView
 action_status(action_id: str) -> {action_id, state, status_text}
@@ -657,7 +685,7 @@ action_status(action_id: str) -> {action_id, state, status_text}
 
 `ActionView` (returned to the model) = `{action_id, state, status_text, checks: [{name, status, detail_for_model}]}`. `detail_for_model` uses names and labels, never addresses or hashes beyond 12 characters.
 
-Example: `propose_send_document("CONTACT_1","FILE_2","Ahead of Friday")` →
+Example: `propose_send_document("THREAD_1","FILE_2","Ahead of Friday")` →
 ```json
 {"action_id":"act_3f9a1c2e","state":"AWAITING_APPROVAL",
  "status_text":"Waiting for your approval in Shield: Projections v3 to Priya Rao.",
@@ -790,12 +818,13 @@ class ActionSpec(Protocol):             # send_document, reply, event today; pay
 | `test_seal.py` | `build_mime` deterministic; the bytes passed to `send_raw` hash to `message_sha256`; adding a Cc/Bcc after sealing → FAILED | I6 |
 | `test_verification_pending.py` | `timeout_after_send` → VERIFICATION_PENDING → VERIFIED, outbox count == 1; `timeout_before_send` → … → UNVERIFIED, outbox 0, never resent; `reject` → FAILED; `lag 3` → VERIFIED after retries; only VERIFIED counted as success in receipts and the harness | I7 |
 | `test_lock.py` | Tamper file after approval → FAILED; tamper payload field → FAILED | I6 |
-| `test_verifier.py` | FakeMail match → VERIFIED; recipient/attachment/subject mismatch → FAILED | I7 |
+| `test_verifier.py` | FakeMail match → VERIFIED; recipient/subject/body/attachment mismatch → UNVERIFIED with the field | I7 |
 | `test_fail_closed.py` | Resolver raises → BLOCKED, nothing in the outbox | I9 |
 | `test_ledger_privacy.py` | After the full demo flow, no ledger line contains any seed address, body substring or file bytes | I8 |
 | `test_receipts.py` | Cap-table question answered with the correct counts | I8 |
 | `test_guarantees.py` | Fixture-enumerated: no value from `fixtures/sensitive_values.json` in any Shielded tool result across the investor follow-up workflow and every tool × purpose; no `@`, no file contents; no tool named `send_email` in the MCP registry | I1, I3 |
 | `test_followups_workflow.py` | "Handle my investor follow-ups" scripted end to end on FakeMail: unrelated sensitive items withheld (counts match), SENDER_3 data-room proposal BLOCKED, Priya VERIFIED, Karan downgraded to teaser. This is the sandbox fallback for the stage demo | I1, I4, I6, I7 (demo path) |
+| `test_policy_and_boundaries.py` | Purpose outside policy refused; request from another session refused; two valid handles outside the request refused; contact handle isn't a request; sent-record mismatch → UNVERIFIED; no resend after restart; MCP listener has no owner routes; MCP has exactly the five tools; owner data and SSE need login; fixture-enumerated privacy | I1, I3, I4, I7, I10 |
 | `test_harness_scoring.py` | Scorers on hand-built sandbox states (no API calls) | measurement |
 
 External clients have in-memory fakes with error injection (`FakeMail` with `fail_mode`; a canned-response fake for the harness agent), so every test runs offline and deterministically. The one live Gmail send is checked manually on stage and in rehearsal.
@@ -834,18 +863,18 @@ If time runs short, cut from the bottom. The live Gmail send stays in scope; Fak
       e3 term sheet, e4 layoff, e5 GST/PAN, e6 medical, …       → withheld, counted by label
     → ReleasedItems (handles + template summaries) + withheld counts; ledger("release")
 4.  Assistant → list_files(category="projections") → FILE_1 (v2), FILE_2 (v3, latest), requires_nda
-5.  Assistant → propose_send_document("CONTACT_1", "FILE_2", "Ahead of Friday")
+5.  Assistant → propose_send_document("THREAD_1", "FILE_2", "Ahead of Friday")   # Priya's request
       gate ✔ · WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY financial + NDA ✔ · CONTENT ✔
       read file once → build MIME (fixed Message-ID, boundary, date) → seal → AWAITING_APPROVAL
-6.  Assistant → propose_send_document("SENDER_3", "FILE_2")
+6.  Assistant → propose_send_document("THREAD_3", "FILE_2")   # stranger's data-room request
       WHO ✘ unknown recipient → BLOCKED (no seal, nothing queued)
-7.  Assistant → propose_send_document("CONTACT_4", "FILE_2")  (Karan, no NDA)
+7.  Assistant → propose_send_document("THREAD_2", "FILE_2")  (Karan, no NDA)
       WHAT ⚠ downgraded to Teaser Deck → AWAITING_APPROVAL (shown if time allows)
 8.  User (logged in) → POST /api/actions/{id}/approve {seal}
       seal == payload_hash ✔ → APPROVED → read file once → hashes ✔ → EXECUTING
       send_attempted = true → GmailMail.send_raw(exact bytes)
 9.  [verifier] find_sent(Message-ID) → recipients ✔ subject ✔ attachment sha ✔ → VERIFIED
-10. Assistant → action_status(id) → "Sent and verified: Priya Rao received Projections v3 (fingerprint matched)."
+10. Assistant → action_status(id) → "Verified in Gmail Sent: Projections v3 to Priya Rao; …"
 11. User → receipts "Did any AI see my cap table today?"
       → "Shield released the cap table 0 times and withheld it twice today."
 ```
@@ -877,7 +906,11 @@ If time runs short, cut from the bottom. The live Gmail send stays in scope; Fak
 | **Seal = hash of exact MIME bytes + full recipient list + attachment hash** | The approval means exactly what the user saw; any change, including an added Bcc, fails (I6) |
 | **Fixed Message-ID, date and boundary at proposal** | Deterministic bytes for the seal, and a stable key to find the sent message even if the send response is lost (I7) |
 | **`send_attempted` set before the provider call** | Guarantees at-most-once sending under timeouts and retries (I7) |
-| **UNVERIFIED as a terminal state** | After the retry window, "may have been sent" is the honest state; FAILED would claim it definitely wasn't |
+| **UNVERIFIED as a terminal state** | "Sent but record differs" and "may have been sent" are both honest states; FAILED would claim it definitely wasn't sent |
+| **Proposals take a request handle, not a recipient** | Makes the shared policy executable: two individually valid handles can't authorise an arbitrary send |
+| **Two listeners** | A tunnel to the MCP listener can't reach approval, raw payloads, SSE or dev endpoints |
+| **Durable send journal (no database)** | In-memory flags guarantee no-resend for one process lifetime; the fsynced journal extends it across restarts |
+| **M0: exactly one To, no Cc/Bcc** | Keeps the approval contract identical for FakeMail and Gmail (Gmail sends from the raw headers, not a separate envelope) |
 | **No approve tool on MCP; owner cookie + seal on REST** | Approval can't be reached by the model or by a prompt (I3, I6) |
 | **No LLM inside Shield** | Determinism, speed, and no "AI guarding AI" (HLD D4) |
 | **In-memory stores + JSON seed** | Hackathon scope; all state is reproducible with `/dev/reset` |

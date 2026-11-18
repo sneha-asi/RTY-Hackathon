@@ -33,14 +33,16 @@ The full product is described in §1–§9. What we build in four hours is in **
 
 ### Technical: what must be true for B1–B6 to hold
 
+**One policy governs what the assistant learns during a task and what it may propose doing with that information.** The founder enables a standing policy once (M0: *investor follow-ups*). The same policy decides what the broker releases and what the guard accepts as a proposal; the assistant's `purpose` argument can only narrow it. The founder normally works in the assistant and sees Shield only when there is an exact message to approve.
+
 The root cause is the lethal trifecta: **private data + untrusted content + a way to act outward** (§1). A model can't be made to reliably refuse instructions it reads, so the defence must not depend on the model. Shield removes or controls each leg in code:
 
 | # | Invariant | Removes / controls |
 |---|---|---|
 | I1 | **Need-to-know at the interface.** The model receives only handles, structured attributes and purpose-filtered summaries that Shield writes. No source text passes through | Private data |
 | I2 | **Untrusted content is data, never instructions.** Hidden text is stripped; instruction-like content is quarantined (a safeguard on top of I1, not the guarantee) | Untrusted content |
-| I3 | **No ambient authority.** The model has no tool that acts; it can only propose | Outward action |
-| I4 | **Code chooses targets and objects** from the user's own records (contacts, file catalogue). Raw addresses are refused | Outward action |
+| I3 | **No ambient authority.** The assistant can request scoped reads and create proposals; execution and approval authority stay outside the assistant | Outward action |
+| I4 | **Proposals are bound to the request that justifies them.** Code takes the recipient from the request and checks the file matches what was asked for, within the standing policy. Two individually valid handles can't be combined outside that request. Raw addresses are refused | Outward action |
 | I5 | **Model-written text carries no outbound channel**: no URLs, images, raw identifiers or sensitive values | Outward action (exfil via content) |
 | I6 | **The user approves the exact sealed payload**: recipients, message bytes, attachment hash. Shield sends the same bytes it checked | Outward action |
 | I7 | **Done is a provider fact.** Only VERIFIED counts; uncertain delivery shows VERIFICATION_PENDING and is never resent automatically | False success |
@@ -61,7 +63,7 @@ The root cause is the lethal trifecta: **private data + untrusted content + a wa
 | I7 | F16 | HLD D6 · LLD §5.4, §6, §7 | `test_verifier`, `test_verification_pending` |
 | I8 | F17 | HLD D8 · LLD §8 | `test_receipts`, `test_ledger_privacy` |
 | I9 | all checks | HLD D7 · LLD §1, §5.1 | `test_fail_closed` |
-| I10 | §4.1, §6 | HLD D9, §5 | Dashboard "sole path" indicator (M1); stated on stage in M0 |
+| I10 | §4.1, §6 | HLD D9, §4, §5 | `test_mcp_listener_has_no_owner_endpoints`; "sole path: yes / no / unknown" indicator (M1); stated on stage in M0 |
 
 ---
 
@@ -160,8 +162,10 @@ The honest claim: **full guarantees in mode 1; strong containment in modes 2–3
 - **One policy, every supported client.** The user writes their rules once (who may receive what, which actions need approval, what is never shared). The same policy, checks and ledger apply to every assistant client that reaches the account through Shield. Switching from Claude to ChatGPT to Cursor changes nothing about what is protected.
 - **Full enforcement requires Shield to be the sole path to the protected account.** If an assistant also holds its own OAuth grant to the same Gmail, it can go around Shield. Shield therefore:
   - lists the account's OAuth grants on connect and asks the user to revoke direct grants to assistants;
-  - re-checks the grants periodically (mode 4) and shows **"sole path: yes / no"** per account on the dashboard;
+  - re-checks the grants periodically (mode 4) and shows **"sole path: yes / no / unknown"** per account. A missing visible grant doesn't prove exclusivity, so where direct access can't be checked the answer is **unknown**;
   - downgrades its own claim for that account from Enforce to Watch while a bypass grant exists.
+- **Data boundary.** Raw data processing, credentials, the executor and approval previews run on the user's machine or infrastructure they control. Only the filtered, authenticated MCP surface is exposed to a remote assistant. Files the user uploads directly to an assistant are outside this path.
+- **Instinct and Muse are compatibility targets, pending testing.** The modes below say how Shield would reach them; none is claimed until tested.
 - It does **not** mean every control works with every assistant. The matrix below says which controls each integration supports.
 
 | Control | Mode 1: MCP connector (Claude, ChatGPT dev mode, Cursor, custom agents) | Mode 2: Edge (local proxy / browser extension) | Mode 3: Mirror (closed assistants) | Mode 4: Watch (any account) |
@@ -277,7 +281,7 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
 | Still useful | The investor follow-up task succeeds through Shield **3/3** runs |
 | Code decides who/what | Every send resolved from contacts + file catalogue; unknown or raw recipient → BLOCKED |
 | Only the user approves | Approval requires the authenticated user and the matching seal; no MCP tool can approve |
-| Proof before "done" | Only VERIFIED counts as success; tampered file/payload → FAILED; ambiguous provider result → VERIFICATION_PENDING, never resent |
+| Proof before "done" | Only VERIFIED ("Verified in Gmail Sent") counts as success; tampered file/payload → FAILED (nothing sent); ambiguous provider result → VERIFICATION_PENDING, never resent, also across restarts; sent record differs → UNVERIFIED |
 | Auditable | Receipt query answers with counts from the ledger, e.g. "Shield released the cap table 0 times and withheld it twice today." |
 | Reliable demo | Full demo 5× in a row; **one live Gmail send verified on stage**; the same flow rehearsed in the sandbox as the fallback |
 
@@ -285,7 +289,7 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
 
 ```
  Claude · ChatGPT (dev mode) · Cursor · any MCP client
-                 │  MCP, streamable HTTP (ngrok for remote)
+                 │  MCP-only listener (the only port exposed)
                  ▼
 ┌───────────────────────────── SHIELD ───────────────────────────────┐
 │ READ   source → cleaner → labeller → purpose rules → handles       │
@@ -324,7 +328,7 @@ Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness on
 | `read` | `purpose`, thread handle | Server-written summary of the thread + structured fields (intent, requested category, due date), only if purpose allows |
 | `list_files` | `category?` | `FILE_n` handles: category, version, requires_nda. Never contents |
 | `free_slots` | date range | Free/busy only |
-| `propose_send_document` | recipient handle, file handle, `note?` | `{action_id, status, checks[], readback}` |
+| `propose_send_document` | **request handle** (`THREAD_n` released in this session), file handle, `note?` | `{action_id, state, status_text, request, checks[]}`. Recipient comes from the request |
 | `propose_reply` | thread handle, text | same |
 | `propose_event` | attendee handles, slot, title | same |
 | `action_status` | `action_id` | Code-written status the assistant relays verbatim |
@@ -339,7 +343,7 @@ There is deliberately **no `send_email(to, …)`**. The Direct baseline (compari
 | WHAT | Latest version of the category; NDA-required file + no NDA → downgrade to teaser with warning | File missing / not latest |
 | POLICY | Financial needs known contact + NDA; `secrets` never shareable | Rule violated |
 | CONTENT | No external URLs, markdown images, raw emails, handles or sensitive patterns; length cap | Any found |
-| LOCK | Seal at proposal; recompute at execution | Hash mismatch → FAILED |
+| LOCK | Seal at proposal (M0: exactly one `To`, no `Cc`/`Bcc`); recompute at execution | Hash mismatch → FAILED, nothing sent |
 
 **Who can approve.** Only the authenticated user. The dashboard's approve/reject endpoints require the user's session (login with a user secret set at install; the MCP client never holds it). There is no approve tool on the MCP surface, so no model, prompt or tool call can approve. An approval request must carry the seal shown on screen; if it doesn't match the action's current seal, the approval is refused.
 
@@ -354,13 +358,17 @@ The approval screen shows the recipients, subject, body, file name and the seal 
 PROPOSED ──► BLOCKED                          (terminal, reason)
     └──► AWAITING_APPROVAL ──► REJECTED       (terminal)
               └──► APPROVED ──► EXECUTING ──► VERIFIED                (terminal ✅, the only success)
-                                    │    └──► FAILED                  (terminal ❌, definitely not sent)
+                                    │    ├──► FAILED                  (terminal ❌, definitely not sent)
+                                    │    └──► UNVERIFIED              (terminal ⚠, sent but the Sent record differs)
                                     └──► VERIFICATION_PENDING ──► VERIFIED
-                                                             └──► UNVERIFIED (terminal ⚠, may have been sent)
+                                                             └──► UNVERIFIED (terminal ⚠, may have been sent / record differs)
 ```
 - **VERIFICATION_PENDING**: the provider timed out or errored *after* the send may have gone out, or the read-back isn't visible yet. The dashboard and the assistant show "may have been sent, verifying". Shield retries verification by looking up the sealed Message-ID in the Sent folder, with backoff, for up to 2 minutes.
 - **Never resend.** Once the send call has been made, the action can never send again, whatever the outcome; retries only re-read.
-- **UNVERIFIED** after the retry window: shown as "may have been sent, could not confirm; check your Sent folder". Not a success, not a silent failure.
+- **UNVERIFIED**: the message was or may have been sent, but Shield can't confirm it matches: either the Sent record differs from the approval (the differing field is recorded) or nothing was found in the retry window. Not a success, not a silent failure.
+- **FAILED** is reserved for actions that were definitely not sent (seal mismatch before sending, or a provider rejection).
+- **Restarts:** a send-attempt marker is written to a local journal and flushed to disk *before* Gmail is called. After a restart, any action with that marker can only be verified, never sent.
+- **What VERIFIED means:** "Verified in Gmail Sent": Gmail's Sent record matches the approved recipient, subject, body and attachment hash. It establishes what Gmail recorded as sent; confirming receipt would need a recipient-side check.
 - **Only VERIFIED counts as success** in the dashboard, receipts, harness and status text.
 
 Every transition appends `{ts, session_id, action_id, from, to, reason}` to the ledger and SSE. Illegal transitions raise. Any error in resolve/check → BLOCKED (fail closed).
@@ -374,10 +382,10 @@ Every transition appends `{ts, session_id, action_id, from, to, reason}` to the 
 | Step | What happens | What the audience sees |
 |---|---|---|
 | 1. Look | Assistant calls `search(purpose=share_document, query="investor")` | **Target** (shown as measured on the dashboard): model gets ~3 items as handles + purpose-filtered summaries: Priya (investor, NDA ✔) asked for projections by Friday; Karan (investor, no NDA) asked for projections; `SENDER_3` (unknown) asked for the data room. **Unrelated sensitive data withheld**: term sheet, cap table, layoff plan, GST/PAN, medical note appear only as "withheld: financial 2 · hr 1 · identity 1 · health 1". The hidden-instruction email shows as `[quarantined · SENDER_4]` |
-| 2. Propose | `propose_send_document(CONTACT_1, FILE_2)` for Priya; `propose_send_document(SENDER_3, FILE_2)` for the stranger | Priya: WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY NDA ✔ · CONTENT ✔ · LOCK sealed → AWAITING_APPROVAL. Stranger: **🛑 BLOCKED, unknown recipient** ("add them as a contact first") |
+| 2. Propose | `propose_send_document(THREAD_1, FILE_2)` answering Priya's request; `propose_send_document(THREAD_3, FILE_2)` answering the stranger's request | Priya: WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY NDA ✔ · CONTENT ✔ · LOCK sealed → AWAITING_APPROVAL. Stranger: **🛑 BLOCKED, unknown recipient** ("add them as a contact first") |
 | 3. Approve | Founder approves Priya's card on the dashboard (logged in) | Card shows the real address, subject, body, `Projections_v3.pdf` and the seal prefix |
 | 4. Send + verify | Live Gmail send of the sealed bytes, read-back from Sent | **✅ VERIFIED**: recipients match, attachment SHA-256 matches |
-| 5. Relay | Assistant calls `action_status` and repeats the code-written text | "Sent and verified: Priya Rao received Projections v3." |
+| 5. Relay | Assistant calls `action_status` and repeats the code-written text | "Verified in Gmail Sent: Projections v3 to Priya Rao; recipient, message and attachment fingerprint match what you approved." |
 
 Karan's request (no NDA) is handled in the same run: WHAT downgrades to the Teaser Deck with a warning. Shown if time allows.
 
@@ -414,7 +422,7 @@ All P0 unless marked.
 | F5 | Handle registry, per session, server-side | No raw address or file path in any Shielded result |
 | F6 | Purpose rules ×4 | Per-purpose released/withheld tests |
 | F7 | Exposure accounting per call and session | Demo task measured; target ≤4 released, 0 sensitive fixture values |
-| F8 | Handle-only proposals, no raw send | Raw address in args → BLOCKED |
+| F8 | Request-bound, handle-only proposals; no raw send | Raw address in args → BLOCKED; a handle that isn't a request released in this session → BLOCKED; file not matching the request → BLOCKED |
 | F9 | WHO | A4 → BLOCKED |
 | F10 | WHAT | Priya → v3; Karan → teaser |
 | F11 | POLICY | One test per rule |
@@ -422,7 +430,7 @@ All P0 unless marked.
 | F13 | LOCK | Tampered payload or file → FAILED |
 | F14 | Approval API + dashboard showing the real sealed payload; authenticated user only; approval carries the seal | Unauthenticated or wrong-seal approval refused; only AWAITING_APPROVAL approvable; idempotent |
 | F15 | Executor: sandbox + Gmail; sends the exact sealed MIME bytes | Real email lands in investor test inbox; sent bytes hash == sealed message hash |
-| F16 | Verifier with VERIFICATION_PENDING and retry | Match → VERIFIED; mismatch → FAILED; provider timeout → VERIFICATION_PENDING → retried, never resent |
+| F16 | Verifier with VERIFICATION_PENDING, retry and a durable send-attempt journal | Match → VERIFIED; confirmed mismatch → UNVERIFIED with the differing field; provider timeout → VERIFICATION_PENDING → retried, never resent, also after a restart |
 | F17 | Ledger + SSE + receipt queries | Cap-table question answered correctly |
 | F18 | MCP server (streamable HTTP) | Claude connects and completes the demo task |
 | F19 | Harness: Direct vs Shielded, 3 runs each | Dashboard shows measured utility / attack success / exposure |
@@ -447,7 +455,7 @@ All P0 unless marked.
 
 - Anthropic API (`claude-sonnet-5-5`) for the harness agent only.
 - Gmail API (`gmail.send`, `gmail.readonly`) with a pre-generated `token.json`.
-- Official MCP Python SDK; ngrok; Claude custom connector (remote MCP) [V]. If the venue network blocks it, the backup video covers it.
+- Official MCP Python SDK. On stage the MCP client runs on the same laptop (Claude Code), so nothing is tunnelled. If a remote client is used, only the MCP listener is exposed, never the owner console.
 - All demo data is synthetic. Existing seed in `backend/data/` is reused: Priya Rao (investor, NDA), Karan Mehta (investor, no NDA), Projections v2/v3, Teaser Deck.
 
 ### 10.9 Definition of done

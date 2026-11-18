@@ -30,16 +30,27 @@ The PRD's first principles (PRD § "First principles") lead to these design prin
 | # | Design principle | Because |
 |---|---|---|
 | D1 | **Shield writes every byte the model receives.** Tool results are assembled from handles, enums, catalogue values, parsed dates and fixed templates. No source text is passed through | I1: privacy must be testable at the interface, not hoped for from detection |
-| D2 | **The model holds no capability.** No tool performs an action; every action tool only creates a proposal | I3: the external-action leg of the trifecta is removed, not filtered |
-| D3 | **Targets and objects come from the user's records.** Handles resolve server-side to contacts and catalogue files; raw addresses are refused | I4 |
+| D0 | **One standing policy drives both paths.** The founder enables it once; the broker releases only what it covers and the guard accepts only proposals it covers, bound to the request that justified them. `purpose` can only narrow it | PRD "one policy" principle; I1, I4 |
+| D2 | **The assistant can request scoped reads and create proposals; execution and approval authority stay outside the assistant** | I3: the external-action leg of the trifecta is removed, not filtered |
+| D3 | **Targets come from the request; objects must match it.** The recipient is the sender of a request released in this session; the file must be the category asked for (teaser is the only policy-approved substitute); raw addresses are refused | I4 |
 | D4 | **No LLM inside Shield.** Every decision is a pure function of seed data, session state and the proposal | Determinism; avoids "AI guarding AI"; < 150 ms per call |
 | D5 | **Approval binds to a seal.** The user approves a hash of the exact recipients, message bytes and attachment bytes; the executor sends only bytes that re-hash to it | I6 |
 | D6 | **Done is a provider fact.** Success requires reading the provider's own record; an uncertain send moves to VERIFICATION_PENDING and is never resent | I7 |
 | D7 | **Fail closed.** Any exception in resolve, check or summarise → BLOCKED or withheld | I9 |
 | D8 | **Log decisions, not content.** The ledger stores IDs, labels, hashes and reasons | I8 |
-| D9 | **Claims follow the access path.** The dashboard shows per account whether Shield is the sole path and which mode applies | I10 |
+| D9 | **Claims follow the access path.** Per account: "sole path: yes / no / unknown"; unknown whenever direct access can't be checked | I10 |
 
 ## 3. Component architecture
+
+**Shared policy.** The standing policy (`data/policy.json`, M0: `investor_followups`) is bound to each MCP session when it starts. It feeds both the broker (which purposes, roles and categories may be released) and the guard (which requests may be answered, with which file categories, to which roles). A proposal names a *request* handle; the guard checks the request was released in this session under this policy.
+
+```
+            standing policy (founder enables once: investor_followups)
+                  │                                   │
+                  ▼                                   ▼
+   BROKER: what may be learned             GUARD: what may be proposed
+   (purposes, roles, categories)           (request → recipient, category match, NDA fallback)
+```
 
 ```
    Assistant client (Claude · ChatGPT dev mode · Cursor · any MCP client)
@@ -75,14 +86,28 @@ The PRD's first principles (PRD § "First principles") lead to these design prin
 | Dashboard | Login, approval cards with real resolved payload, exposure panels, timeline, receipts | Yes (the user's own data, behind login) | No |
 | Comparison harness | Same task, same model, Direct vs Shielded; scores from sandbox state | Direct mode only | Yes (harness agent) |
 
-## 4. Trust boundaries
+## 4. Deployment boundary and trust boundaries
+
+```
+ ┌──────────── user-controlled machine / infrastructure ────────────┐
+ │  raw data · credentials (token.json) · broker · guard · executor   │
+ │  verifier · ledger · send journal                                  │
+ │  OWNER CONSOLE 127.0.0.1:8000  (login, approval preview, SSE, dev) │  ← never tunnelled
+ │  MCP LISTENER  :8765/mcp       (filtered tools only)               │  ← the only exposed surface
+ └────────────────────────────────────────┬──────────────────────────┘
+                                          ▼
+                         remote assistant client (MCP)
+```
+
+The MCP listener is a separate ASGI app with no owner routes; a tunnel to it cannot reach approval, dashboard data, SSE or dev endpoints (tested). Files a user uploads directly to an assistant are outside this boundary.
+
 
 | Boundary | What may cross | What may not | Enforced by |
 |---|---|---|---|
 | Shield → model | Handles, structured attributes, purpose-filtered summaries, withheld counts, quarantine notices, code-written status text | Source text, addresses, file bytes, detected sensitive values | Broker output types (D1); fixture-enumerated test |
 | Model → Shield | Read tool calls; proposals made of handles plus a short note | Raw addresses, URLs, images, approvals | Argument gate; CONTENT check; no approve tool |
 | User → Shield | Login; approve or reject with the seal shown | Approval without login or with a different seal | Owner session cookie; seal equality (401 / 409) |
-| Shield → provider | The sealed message bytes, once | A second send for the same action | `send_attempted` flag set before the call |
+| Shield → provider | The sealed message bytes, once | A second send for the same action, including after a restart | Send-attempt marker written to a local journal and fsynced before the call |
 | Provider → Shield | Send result; Sent-folder record by Message-ID | — | Verifier compares against sealed values |
 | Shield → logs | IDs, labels, hashes, reasons | Bodies, addresses, attachments | Ledger schema; ledger-privacy test |
 | Secrets | `.env`, `token.json`, user secret | Anything in git | `.gitignore`; env-only config |
@@ -93,7 +118,7 @@ The full product has four modes (PRD §4). M0 implements mode 1.
 
 | Mode | M0 | What holds |
 |---|---|---|
-| 1. Enforce (MCP; Shield is the only route) | **Built** | All invariants I1–I10 |
+| 1. Enforce (MCP; Shield is the only route) | **Built** | All invariants I1–I10. Sole path shown as yes / no / unknown |
 | 2. Enforce at the edge (local proxy / extension) | Roadmap | Egress blocking, partial read control |
 | 3. Contain (supported mirror for closed assistants) | Roadmap | Minimisation by construction; mirror sends gated |
 | 4. Watch and revoke | Roadmap | After-the-fact detection, as far as each provider exposes |
@@ -102,8 +127,8 @@ How each focus assistant is reached (PRD §1):
 
 | Assistant | Mode(s) | M0 |
 |---|---|---|
-| Instinct (closed, own login) | 3 Contain (mirror inbox) + 4 Watch & revoke | Roadmap |
-| Muse (desktop agent) | 2 Edge + 3 Contain + 4 Watch & revoke | Roadmap |
+| Instinct (closed, own login) | 3 Contain (mirror inbox) + 4 Watch & revoke | Compatibility target, pending testing |
+| Muse (desktop agent) | 2 Edge + 3 Contain + 4 Watch & revoke | Compatibility target, pending testing |
 | OpenClaw (user-run) | 1 Enforce if its tools can point at Shield [U]; else 2 Edge | Roadmap |
 | Claude (MCP connector) | 1 Enforce | **Demo client**: proves the mechanism end to end |
 
@@ -122,13 +147,13 @@ search(purpose, query) → for each item: clean → label → purpose rule → (
 
 **Act**
 ```
-propose_send_document(CONTACT_1, FILE_2, note)
+propose_send_document(THREAD_1, FILE_2, note)     # the request handle, not a recipient
   → argument gate → WHO → WHAT → POLICY → CONTENT          (all run; any fail → BLOCKED)
   → read file once → build exact MIME → seal               (LOCK)
   → AWAITING_APPROVAL → dashboard card
 user approve(seal)
   → re-read once → hash checks → send those bytes          (send_attempted = true first)
-  → verifier: find by Message-ID → VERIFIED | FAILED | VERIFICATION_PENDING → retry → VERIFIED | UNVERIFIED
+  → verifier: find by Message-ID in Gmail Sent → VERIFIED | UNVERIFIED (record differs) | VERIFICATION_PENDING → retry → VERIFIED | UNVERIFIED
 ```
 
 **Action lifecycle**
@@ -137,8 +162,9 @@ PROPOSED ─► BLOCKED
    └─► AWAITING_APPROVAL ─► REJECTED
             └─► APPROVED ─► FAILED (seal mismatch, nothing sent)
                    └─► EXECUTING ─► VERIFIED ✅ (only success)
-                          │    └──► FAILED (definitely not sent, or sent but mismatched)
-                          └─► VERIFICATION_PENDING ─► VERIFIED │ FAILED │ UNVERIFIED (may have been sent)
+                          │    ├──► FAILED (definitely not sent: provider rejected)
+                          │    └──► UNVERIFIED (sent, record differs)
+                          └─► VERIFICATION_PENDING ─► VERIFIED │ UNVERIFIED (may have been sent / record differs)
 ```
 
 ## 7. Data architecture (M0)
@@ -167,12 +193,12 @@ All data is in memory, plus JSON seed files and a git-ignored runtime directory.
 
 | Slice (LLD §16) | Tests | Status |
 |---|---|---|
-| 1. Vertical slice: MCP → proposal → approval page → FakeMail → read-back → VERIFIED | seal, state machine, approval auth, verifier | Not started |
-| 2. VERIFICATION_PENDING + no-resend; tamper | verification_pending, lock | Not started |
-| 3. Full seed, cleaner, labels, fixture privacy test | detectors, cleaner, guarantees | Not started |
-| 4. Gmail adapter, one live send | manual + verifier | Not started |
-| 5. Ledger receipts, SSE, dashboard | receipts, ledger privacy | Not started |
-| 6. Comparison scenes | harness scoring | Not started |
-| 7. Calendar first cut (free/busy) | broker | Not started |
+| 1. Vertical slice: MCP → request-bound proposal → owner console approval → FakeMail → read-back → VERIFIED | `test_slice` (18) | **Done** |
+| 2. VERIFICATION_PENDING, no-resend, durable journal + restart recovery, tamper → FAILED, mismatch → UNVERIFIED | `test_slice`, `test_policy_and_boundaries` | **Done** |
+| 3. Seed (15 emails, events, A1/A2/A5 hidden-text attacks, A4 stranger), cleaner, detectors, fixture privacy test | `test_policy_and_boundaries` | **Done** (detector unit tests pending) |
+| 4. Gmail adapter, one live send | manual | Code done; needs `token.json` |
+| 5. Receipts, SSE, owner console | `test_receipt_cap_table_counts_from_ledger` | **Done** |
+| 6. Comparison scenes (Direct vs Shielded) | — | Not started |
+| 7. Calendar first cut (free/busy) | covered in privacy test | **Done** |
 
-Existing in repo: seed contacts and files, demo PDFs, settings loader, append-only event log.
+29 tests passing.
