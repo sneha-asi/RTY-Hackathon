@@ -118,3 +118,12 @@ Expect `VERIFIED`, and the email in the recipient inbox.
 4. Click **Approve & send** once. The page shows **Verified in Gmail Sent**. Open the recipient inbox to show delivery.
 
 **What this proves, and what it doesn't.** Instinct prepared a real follow-up without access to the confidential file. Shield accounts for what it published and what it sent. It does not cover any other mailbox connected to Instinct, and it cannot inspect Instinct's internal context.
+
+### Before and after with Instinct (two demo inboxes, never your personal Gmail)
+
+| Scene | Instinct is connected to | What you show |
+|---|---|---|
+| **Without Shield** | A demo *executive* inbox seeded with the full synthetic mailbox (`scripts/seed_unprotected_inbox.py`) | Ask Instinct: "Handle my investor follow-ups." It can read the term sheet, cap table, PAN and medical note, and it sees the hidden-instruction emails and the stranger's data-room request. Show whatever it actually does |
+| **With Shield** | The restricted demo inbox (Shield's safe publication only) | The same request returns only `REQ_7` / `FILE_2`. The proposal goes through Shield: review page, one approval, Verified in Gmail Sent. The stranger is never in its view |
+
+Switch Instinct's Gmail connection between the two scenes, or use two Instinct profiles. Disconnect your personal Gmail from the Instinct profile used on stage: whatever Instinct can reach directly is outside Shield's protection.
