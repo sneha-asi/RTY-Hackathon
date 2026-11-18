@@ -305,7 +305,7 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
    Sandbox (JSON mail/calendar/drive)    Gmail API (send + read-back)
 ```
 
-Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness only) · Gmail API · Vite + React + Tailwind · SSE. **No LLM inside Shield; no database.**
+Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness only) · Gmail API · static HTML + JS pages served by the owner listener (no build step) · SSE. **No LLM inside Shield; no database.**
 
 | Module | Job |
 |---|---|
@@ -321,7 +321,7 @@ Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness on
 | `mcp_server.py` | Tool surface below |
 | `harness.py` | Direct vs Shielded runs with Claude; deterministic scoring |
 | `main.py` | FastAPI: dashboard REST, SSE, approvals, dev endpoints |
-| `dashboard/` | React UI |
+| `app/static/` | Owner console (`index.html`) and the single approval page (`review.html`) |
 
 **MCP tools (Shielded):**
 

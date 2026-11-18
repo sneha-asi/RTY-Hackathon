@@ -58,7 +58,7 @@ backend/
   data/              contacts.json, files.json (extend) + emails.json, events.json (new)
   files/             demo files (PDF/TXT); copied to a runtime dir at startup
   tests/
-dashboard/           Vite + React + Tailwind
+app/static/          index.html (owner console) · review.html (approval page)
 ```
 
 ## 3. Data model
@@ -751,7 +751,7 @@ Results are stored as `harness` ledger events and shown exactly as measured.
 
 ## 12. Dashboard (`dashboard/`)
 
-Vite + React + Tailwind, one page, an SSE subscription to `/api/events`, polling `/api/state` on each event.
+Plain HTML + JS (`app/static/index.html`, `app/static/review.html`), served by the owner listener, an SSE subscription to `/api/events`, polling `/api/state` on each event.
 
 | Component | Shows |
 |---|---|

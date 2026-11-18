@@ -5,7 +5,7 @@
 | Team | Axon |
 | Product | Shield |
 | Status | M0 (hackathon build) |
-| Stack | Python 3.12 · FastAPI · official `mcp` SDK · Gmail API · Vite + React + Tailwind · SSE |
+| Stack | Python 3.12 · FastAPI · official `mcp` SDK · Gmail API · static HTML + JS pages served by the owner listener (no build step) · SSE |
 | Related docs | [PRD](PRD.md) (what and why) · [LLD](LLD.md) (how, in detail) · [One-pager](ONE_PAGER.md) |
 
 ---
