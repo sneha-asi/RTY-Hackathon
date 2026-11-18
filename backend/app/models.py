@@ -94,9 +94,9 @@ class State(str, Enum):
 TRANSITIONS: dict[State, set[State]] = {
     State.PROPOSED: {State.BLOCKED, State.AWAITING_APPROVAL},
     State.AWAITING_APPROVAL: {State.APPROVED, State.REJECTED},
-    State.APPROVED: {State.EXECUTING, State.FAILED},
-    State.EXECUTING: {State.VERIFIED, State.FAILED, State.VERIFICATION_PENDING},
-    State.VERIFICATION_PENDING: {State.VERIFIED, State.FAILED, State.UNVERIFIED},
+    State.APPROVED: {State.EXECUTING, State.FAILED},  # FAILED = definitely not sent
+    State.EXECUTING: {State.VERIFIED, State.FAILED, State.VERIFICATION_PENDING, State.UNVERIFIED},
+    State.VERIFICATION_PENDING: {State.VERIFIED, State.UNVERIFIED},
 }
 TERMINAL = {State.BLOCKED, State.REJECTED, State.VERIFIED, State.FAILED, State.UNVERIFIED}
 SUCCESS = {State.VERIFIED}
@@ -134,6 +134,8 @@ class Payload(BaseModel):
 
 class Action(BaseModel):
     id: str
+    policy: str = ""
+    request_handle: str | None = None
     session_id: str
     type: str
     state: State = State.PROPOSED

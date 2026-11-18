@@ -45,6 +45,10 @@ def build_mime(p: Payload, attachment: bytes | None) -> bytes:
     return m.as_bytes()
 
 
+def _norm_body(b: str) -> str:
+    return re.sub(r"\s+", " ", (b or "").replace("\r\n", "\n")).strip()
+
+
 def seal(p: Payload) -> str:
     canon = json.dumps({
         "type": p.type,
@@ -69,8 +73,11 @@ class Conflict(Exception):
 class Guard:
     def __init__(self, seed: Seed, ledger: Ledger, mail, founder_name: str, sender_addr: str,
                  backoff: tuple[float, ...] = (1, 2, 4, 8, 15, 30, 60),
-                 scheduler: Callable[[Callable[[], None]], None] | None = None):
+                 scheduler: Callable[[Callable[[], None]], None] | None = None, journal=None,
+                 sent_label: str = "Sent (sandbox)"):
         self.seed, self.ledger, self.mail = seed, ledger, mail
+        self.journal = journal
+        self.sent_label = sent_label
         self.founder_name, self.sender_addr = founder_name, sender_addr
         self.backoff = backoff
         self.actions: dict[str, Action] = {}
@@ -85,72 +92,92 @@ class Guard:
         if reason:
             a.reason = reason
         self.ledger.emit("transition", session_id=a.session_id, action_id=a.id, frm=old.value, to=new.value, reason=reason)
+        if self.journal and a.send_attempted and new in TERMINAL:
+            self.journal.outcome(a.id, new.value)
         return a
 
     def _lock(self, aid: str) -> threading.Lock:
         return self._locks.setdefault(aid, threading.Lock())
 
     # ---------- propose ----------
-    def propose_send_document(self, session_id: str, reg: HandleRegistry, recipient: str, file: str, note: str = "") -> Action:
-        a = Action(id="act_" + uuid.uuid4().hex[:8], session_id=session_id, type="send_document",
-                   args={"recipient": recipient, "file": file, "note": note}, created_at=now_iso(), updated_at=now_iso())
+    def propose_send_document(self, session_id: str, reg: HandleRegistry, request: str, file: str, note: str = "") -> Action:
+        """Bound to a request released in THIS session under the session's standing policy."""
+        a = Action(id="act_" + uuid.uuid4().hex[:8], session_id=session_id, type="send_document", policy=reg.policy_name,
+                   request_handle=request if isinstance(request, str) else None,
+                   args={"request": request, "file": file, "note": note}, created_at=now_iso(), updated_at=now_iso())
         self.actions[a.id] = a
         self.ledger.emit("transition", session_id=session_id, action_id=a.id, frm=None, to=State.PROPOSED.value, reason="")
         try:
-            return self._run_checks(a, reg, recipient, file, note or "")
+            return self._run_checks(a, reg, request, file, note or "")
         except Exception as e:  # fail closed (I9)
             for c in a.checks:
                 if c.status == "pending":
                     c.status, c.detail = "fail", "not evaluated"
             return self._to(a, State.BLOCKED, f"internal: {type(e).__name__}")
 
-    def _run_checks(self, a: Action, reg: HandleRegistry, recipient: str, file: str, note: str) -> Action:
+    def _run_checks(self, a: Action, reg: HandleRegistry, request: str, file: str, note: str) -> Action:
         who, what, policy, content, lock = (a.check(n) for n in ("WHO", "WHAT", "POLICY", "CONTENT", "LOCK"))
-        contact = None
-        # argument gate + WHO (I4)
-        if any(isinstance(v, str) and ("@" in v or "://" in v) for v in (recipient, file)):
+        pol = reg.policy
+        contact, req = None, None
+        # argument gate + WHO: the recipient comes from the request, never from the model (I4)
+        if any(isinstance(v, str) and ("@" in v or "://" in v) for v in (request, file)):
             who.status, who.detail = "fail", "raw address not accepted; use a handle"
+        elif not pol.get("enabled"):
+            who.status, who.detail = "fail", "no standing policy enabled for this session"
         else:
-            h = reg.resolve(recipient)
-            if h is None:
-                who.status, who.detail = "fail", "unknown handle"
-            elif h.kind == "SENDER":
-                who.status, who.detail = "fail", "unknown recipient: add them as a contact first"
-            elif h.kind != "CONTACT":
-                who.status, who.detail = "fail", f"{h.kind} is not a recipient"
+            req = reg.requests.get(request)
+            if req is None:
+                who.status, who.detail = "fail", "not a request released in this session"
             else:
-                contact = self.seed.contact(h.ref)
-                who.status, who.detail = "pass", f"{contact.name} · {contact.org}"
-        # WHAT
+                sh = reg.resolve(req["sender"])
+                if sh is None or sh.kind == "SENDER":
+                    who.status, who.detail = "fail", "unknown recipient: add them as a contact first"
+                else:
+                    contact = self.seed.contact(sh.ref)
+                    if contact.role not in pol.get("recipient_roles", []):
+                        who.status, who.detail = "fail", f"{contact.role} is outside policy '{reg.policy_name}'"
+                        contact = None
+                    else:
+                        who.status, who.detail = "pass", f"{contact.name} · {contact.org} (from {request})"
+        # WHAT: the file must match what the request asked for (teaser fallback is the only exception)
         frec = None
         fh = reg.resolve(file)
         if fh is None or fh.kind != "FILE":
             what.status, what.detail = "fail", "unknown file handle"
         else:
             frec = self.seed.file(fh.ref)
+            asked = req["category"] if req else None
             if not frec.shareable:
                 what.status, what.detail = "fail", "file is not shareable"
+                frec = None
+            elif asked is not None and asked not in pol.get("categories", []):
+                what.status, what.detail = "fail", f"request asks for {asked.replace('_', ' ')}, which policy '{reg.policy_name}' does not cover"
+                frec = None
+            elif asked is not None and frec.category != asked:
+                what.status, what.detail = "fail", f"request asked for {asked}, not {frec.category}"
+                frec = None
             else:
                 latest = self.seed.latest(frec.category)
                 if latest and latest.id != frec.id:
                     a.warnings.append(f"{frec.label} requested; using latest {latest.label}")
                     frec = latest
-                if contact and frec.requires_nda and not contact.nda:
-                    teaser = self.seed.file("teaser")
-                    a.warnings.append(f"{contact.first_name} has no NDA: sending {teaser.label} instead of {frec.label}")
-                    frec = teaser
-                what.status = "warn" if a.warnings else "pass"
-                what.detail = f"{frec.label} · {frec.filename}" + (f" ({'; '.join(a.warnings)})" if a.warnings else "")
+                if contact and frec.requires_nda and not contact.nda and pol.get("nda_fallback"):
+                    fb = self.seed.file(pol["nda_fallback"])
+                    a.warnings.append(f"{contact.first_name} has no NDA: sending {fb.label} instead of {frec.label}")
+                    frec = fb
+                if what.status == "pending":
+                    what.status = "warn" if a.warnings else "pass"
+                    what.detail = f"{frec.label} · {frec.filename}" + (f" ({'; '.join(a.warnings)})" if a.warnings else "")
         # POLICY
         if frec is None:
-            policy.status, policy.detail = "fail", "no file"
-        elif set(frec.sensitivity) & NEVER_SHARE:
-            policy.status, policy.detail = "fail", f"{', '.join(sorted(set(frec.sensitivity) & NEVER_SHARE))} is never shared"
+            policy.status, policy.detail = "fail", "no file to check"
+        elif set(frec.sensitivity) & set(pol.get("never_share", [])):
+            policy.status, policy.detail = "fail", f"{', '.join(sorted(set(frec.sensitivity) & set(pol['never_share'])))} is never shared"
         elif "financial" in frec.sensitivity and not (contact and contact.nda):
             policy.status, policy.detail = "fail", "financial file needs a known contact with an NDA"
         else:
             policy.status = "pass"
-            policy.detail = ("financial · NDA on file" if "financial" in frec.sensitivity else "no restriction")
+            policy.detail = f"{reg.policy_name} · " + ("financial, NDA on file" if "financial" in frec.sensitivity else "no restriction")
         # CONTENT (I5)
         problems = []
         if URL_RX.search(note):
@@ -186,6 +213,9 @@ class Guard:
         data = self.seed.read_file_once(frec)
         p.attachment_sha256 = sha256_bytes(data)
         p.message_sha256 = sha256_bytes(build_mime(p, data))
+        if p.cc or p.bcc or len(p.to) != 1:  # M0 contract: exactly one To recipient
+            lock.status, lock.detail = "fail", "M0 supports exactly one To recipient"
+            return self._to(a, State.BLOCKED, "LOCK: M0 supports exactly one To recipient")
         a.payload, a.payload_hash = p, seal(p)
         a.display = {"recipient": contact.name, "file": frec.label}
         lock.status, lock.detail = "pass", f"sealed {a.payload_hash[:12]}"
@@ -220,8 +250,16 @@ class Guard:
             raw = build_mime(p, data)
             if sha256_bytes(raw) != p.message_sha256 or seal(p) != a.payload_hash:
                 return self._to(a, State.FAILED, "changed after approval: message")
+            if self.journal and self.journal.attempted(a.id):  # survived a restart: verify only, never resend
+                self._to(a, State.EXECUTING)
+                a.send_attempted = True
+                self._to(a, State.VERIFICATION_PENDING, "send already attempted before restart")
+                self._scheduler(lambda: self._verify_loop(a.id))
+                return a
             self._to(a, State.EXECUTING)
             a.send_attempted = True  # before the provider call: at most once (I7)
+            if self.journal:
+                self.journal.attempt(a.model_dump(mode="json"))  # durable marker, fsynced before sending
             try:
                 a.sent_message_id = self.mail.send_raw(raw, envelope=p.to + p.cc + p.bcc, bcc=p.bcc)
             except DefinitelyNotSent as e:
@@ -232,9 +270,9 @@ class Guard:
                 return a
             verdict = self.verify_once(a)
             if verdict == "ok":
-                return self._to(a, State.VERIFIED, "recipients, subject and attachment fingerprint match")
+                return self._to(a, State.VERIFIED, f"found in {self.sent_label}; recipient, subject, body and attachment match")
             if verdict == "mismatch":
-                return self._to(a, State.FAILED, f"sent but does not match approval: {self._first_mismatch(a)}")
+                return self._to(a, State.UNVERIFIED, f"sent record differs from approval: {self._first_mismatch(a)}")
             self._to(a, State.VERIFICATION_PENDING, "sent; read-back not visible yet")
             self._scheduler(lambda: self._verify_loop(a.id))
             return a
@@ -250,6 +288,7 @@ class Guard:
         checks = {
             "recipients": n(s.to + s.cc + s.bcc) == n(p.to + p.cc + p.bcc),
             "subject": s.subject == p.subject,
+            "body": _norm_body(s.body) == _norm_body(p.body),
             "attachment": s.attachments == [(p.file_name, p.attachment_sha256)],
         }
         a.verification = checks
@@ -270,10 +309,10 @@ class Guard:
                     return
                 v = self.verify_once(a)  # read only — never send_raw here
                 if v == "ok":
-                    self._to(a, State.VERIFIED, "found in Sent; matches approval")
+                    self._to(a, State.VERIFIED, f"found in {self.sent_label}; matches approval")
                     return
                 if v == "mismatch":
-                    self._to(a, State.FAILED, f"sent but does not match approval: {self._first_mismatch(a)}")
+                    self._to(a, State.UNVERIFIED, f"sent record differs from approval: {self._first_mismatch(a)}")
                     return
         with self._lock(aid):
             if a.state == State.VERIFICATION_PENDING:
@@ -290,12 +329,31 @@ class Guard:
             State.APPROVED: "Approved; sending.",
             State.EXECUTING: "Sending now.",
             State.VERIFICATION_PENDING: "The email may have been sent. Shield is checking your Sent folder and will not send it again.",
-            State.VERIFIED: f"Sent and verified: {r} received {f} (fingerprint matched).",
-            State.FAILED: f"Not done: {a.reason}.",
-            State.UNVERIFIED: "May have been sent, but Shield could not confirm it. Check your Sent folder. Not counted as done.",
+            State.VERIFIED: f"Verified in {self.sent_label}: {f} to {r}; recipient, message and attachment fingerprint match what you approved.",
+            State.FAILED: f"Not sent: {a.reason}.",
+            State.UNVERIFIED: (f"Sent, but the {self.sent_label} record differs from what you approved ({a.reason.split(': ')[-1]}). Not counted as done."
+                               if "differs" in a.reason else
+                               f"May have been sent, but Shield could not confirm it in {self.sent_label}. It will not be resent. Not counted as done."),
         }[a.state]
 
     def view_for_model(self, a: Action) -> dict:
-        return {"action_id": a.id, "state": a.state.value, "status_text": self.status_text(a),
+        return {"action_id": a.id, "state": a.state.value, "status_text": self.status_text(a), "request": a.request_handle,
                 "checks": [{"name": c.name, "status": c.status, "detail": c.detail} for c in a.checks],
                 "warnings": a.warnings}
+
+    # ---------- restart recovery ----------
+    def recover(self) -> list[str]:
+        """Actions with a durable send-attempt marker and no outcome: verify only, never send."""
+        recovered = []
+        if not self.journal:
+            return recovered
+        for d in self.journal.open_attempts():
+            a = Action.model_validate(d)
+            a.state, a.send_attempted = State.VERIFICATION_PENDING, True
+            a.reason = "recovered after restart: send was attempted; verifying only"
+            self.actions[a.id] = a
+            self.ledger.emit("transition", session_id=a.session_id, action_id=a.id, frm="EXECUTING",
+                             to=State.VERIFICATION_PENDING.value, reason=a.reason)
+            self._scheduler(lambda aid=a.id: self._verify_loop(aid))
+            recovered.append(a.id)
+        return recovered

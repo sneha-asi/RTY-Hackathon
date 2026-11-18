@@ -25,6 +25,7 @@ class SentMessage:
     subject: str
     message_id_header: str
     attachments: list[tuple[str, str]] = field(default_factory=list)  # (filename, sha256)
+    body: str = ""
 
 
 def parse_raw(raw: bytes, provider_id: str, envelope_bcc: list[str] | None = None) -> SentMessage:
@@ -35,7 +36,9 @@ def parse_raw(raw: bytes, provider_id: str, envelope_bcc: list[str] | None = Non
         data = part.get_payload(decode=True) or b""
         atts.append((part.get_filename(), hashlib.sha256(data).hexdigest()))
     bcc = addrs("Bcc") or list(envelope_bcc or [])
-    return SentMessage(provider_id=provider_id, to=addrs("To"), cc=addrs("Cc"), bcc=bcc,
+    body_part = msg.get_body(preferencelist=("plain",))
+    body = body_part.get_content() if body_part is not None else ""
+    return SentMessage(body=body, provider_id=provider_id, to=addrs("To"), cc=addrs("Cc"), bcc=bcc,
                        subject=str(msg.get("Subject", "")), message_id_header=str(msg.get("Message-ID", "")).strip(),
                        attachments=atts)
 

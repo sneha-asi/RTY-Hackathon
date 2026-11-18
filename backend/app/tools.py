@@ -13,14 +13,19 @@ def _public(d: dict) -> dict:
 def _record(shield: Shield, session_id: str, tool: str, result: dict) -> dict:
     import json
     spans = labels.detect(json.dumps(result))
-    shield.ledger.emit("exposure", session_id=session_id, tool=tool,
-                       sensitive_values=len({s.value_hash for s in spans}))
+    n = len({s.value_hash for s in spans})
+    shield.ledger.emit("exposure", session_id=session_id, tool=tool, sensitive_values=n)
+    shield.model_view.append({"session_id": session_id, "tool": tool, "sensitive_values": n, "result": result})
     return result
 
 
 def search(shield: Shield, session_id: str, purpose: str, query: str = "") -> dict:
     reg = shield.registry(session_id)
-    out = shield.broker.release(reg, purpose, query)
+    try:
+        out = shield.broker.release(reg, purpose, query)
+    except (PermissionError, ValueError) as e:
+        shield.ledger.emit("request_denied", session_id=session_id, tool="search", purpose=purpose, reason=str(e))
+        return {"error": str(e)}
     shield.ledger.emit("release", session_id=session_id, purpose=purpose, released_ids=out["_released_ids"],
                        quarantined_ids=out["_quarantined_ids"], withheld_ids=out["_withheld_ids"],
                        withheld=out["withheld"])
@@ -42,8 +47,8 @@ def free_slots(shield: Shield, session_id: str, start: str, end: str) -> dict:
     return _record(shield, session_id, "free_slots", shield.broker.free_slots(start, end))
 
 
-def propose_send_document(shield: Shield, session_id: str, recipient: str, file: str, note: str = "") -> dict:
-    a = shield.guard.propose_send_document(session_id, shield.registry(session_id), recipient, file, note)
+def propose_send_document(shield: Shield, session_id: str, request: str, file: str, note: str = "") -> dict:
+    a = shield.guard.propose_send_document(session_id, shield.registry(session_id), request, file, note)
     return _record(shield, session_id, "propose_send_document", shield.guard.view_for_model(a))
 
 

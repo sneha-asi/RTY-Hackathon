@@ -90,12 +90,17 @@ class Broker:
             summary = f"{who} asked a question about {_topic(text)}."
         else:
             summary = f"{who} sent an update about {_topic(text)}."
+        if intent == "document_request" and item.kind == "email":
+            reg.note_request(h.handle, item.id, cat, sender.handle)
         return ReleasedItem(handle=h.handle, kind=item.kind, sender=sender.handle, intent=intent,
                             requested_category=cat, due=due, summary=summary)
 
     def release(self, reg: HandleRegistry, purpose: str, query: str = "") -> dict:
         if purpose not in PURPOSES:
             raise ValueError(f"unknown purpose: {purpose}")
+        allowed = reg.policy.get("purposes", [])
+        if purpose not in allowed:
+            raise PermissionError(f"purpose '{purpose}' is outside the enabled policy '{reg.policy_name}' (allowed: {', '.join(allowed)})")
         items: list[ReleasedItem] = []
         withheld: Counter = Counter()
         released_ids, quarantined_ids, withheld_ids = [], [], []
@@ -113,9 +118,10 @@ class Broker:
             keep = False
             if purpose == "share_document":
                 keep = item.kind == "email" and intent == "document_request" and cat is not None
-                if keep and q.startswith("investor"):
-                    keep = sender_c is None or sender_c.role == "investor"
-                elif keep and q:
+                roles = reg.policy.get("recipient_roles", [])
+                if keep:  # policy scope: requests from the policy's recipient roles, plus unknown senders (so Shield can show the block)
+                    keep = sender_c is None or sender_c.role in roles
+                if keep and q and not q.startswith("investor"):
                     keep = q in text.lower()
             elif purpose == "schedule":
                 keep = item.kind == "event" or (intent == "meeting_request" and not labs)
