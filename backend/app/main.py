@@ -239,6 +239,30 @@ async def dev_mail_fault(req: Request, shield_owner: str | None = Cookie(default
     return {"ok": True}
 
 
+@app.get("/api/mirror/publication")
+def mirror_publication(shield_owner: str | None = Cookie(default=None)):
+    """The safe text Shield publishes into the restricted demo inbox (Contain mode)."""
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    from . import mirror
+    return mirror.publication(shield)
+
+
+@app.post("/api/intake")
+async def intake(req: Request, shield_owner: str | None = Cookie(default=None)):
+    """Owner pastes the assistant's reply (e.g. from WhatsApp). Untrusted: only REQ_n / FILE_n / note are used."""
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    from . import mirror
+    body = await req.json()
+    return mirror.intake(shield, str(body.get("text", "")), str(body.get("source") or "Instinct (WhatsApp, pasted)"))
+
+
+@app.get("/intake")
+def intake_page():
+    return FileResponse(STATIC / "intake.html")
+
+
 @app.get("/review/{aid}")
 def review_page(aid: str):
     """The single approval page every assistant links to. Static shell; data comes from the owner-only API."""

@@ -177,7 +177,7 @@ class Guard:
             elif asked is not None and asked not in pol.get("categories", []):
                 what.status, what.detail = "fail", f"request asks for {asked.replace('_', ' ')}, which policy '{reg.policy_name}' does not cover"
                 frec = None
-            elif asked is not None and frec.category != asked:
+            elif asked is not None and frec.category != asked and not self._is_nda_fallback(pol, frec, asked, contact):
                 what.status, what.detail = "fail", f"request asked for {asked}, not {frec.category}"
                 frec = None
             else:
@@ -217,6 +217,12 @@ class Guard:
             body += f"\n{note.strip()}\n"
         body += f"\n— {self.founder_name}\n"
         return self._seal_and_queue(a, "send_document", contact, frec.label, body, frec, {"file": frec.label})
+
+    def _is_nda_fallback(self, pol: dict, frec, asked: str, contact) -> bool:
+        """The policy's NDA fallback (teaser) may answer a request for an NDA-only category from a contact without an NDA."""
+        latest = self.seed.latest(asked)
+        return (frec.id == pol.get("nda_fallback") and contact is not None and not contact.nda
+                and latest is not None and latest.requires_nda)
 
     def _seal_and_queue(self, a: Action, kind: str, contact, subject: str, body: str, frec, display: dict) -> Action:
         """Build the exact outgoing MIME once, seal recipient + bytes + attachment hash, queue for approval (I6)."""
@@ -347,7 +353,7 @@ class Guard:
     def verify_once(self, a: Action) -> str:
         p = a.payload
         a.verify_attempts += 1
-        s = self.mail.find_sent(p.message_id)
+        s = self.mail.find_sent(p.message_id, provider_id=a.sent_message_id)
         if s is None:
             return "not_found"
         n = lambda xs: sorted(norm_addr(x) for x in xs)

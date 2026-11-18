@@ -69,7 +69,7 @@ What the dashboard reports, kept separate:
 
 ## Build status
 
-Done and tested on the sandbox mailbox (117 tests): request-bound proposals, the five checks, exact-message seal, owner-only approval, no-resend with a durable journal, `VERIFICATION_PENDING`/`UNVERIFIED`, separate MCP listener, receipts, owner console. Also done: the Direct-vs-Shielded comparison (measured). Remaining: rehearsal and the backup video. A live Gmail send is optional.
+Done and tested on the sandbox mailbox (122 tests): request-bound proposals, the five checks, exact-message seal, owner-only approval, no-resend with a durable journal, `VERIFICATION_PENDING`/`UNVERIFIED`, separate MCP listener, receipts, owner console. Also done: the Direct-vs-Shielded comparison (measured). Remaining: rehearsal and the backup video. A live Gmail send is optional.
 
 ## Why it scores
 

@@ -1,0 +1,5 @@
+{
+  "_comment": "Stable IDs Shield publishes into the restricted (Contain-mode) demo inbox. Only safe summaries and IDs leave Shield.",
+  "requests": {"REQ_7": "e1", "REQ_8": "e2"},
+  "files": {"FILE_2": "proj_v3", "FILE_3": "teaser"}
+}

@@ -67,3 +67,54 @@ Only Priya's card is approved on stage. Leave Karan's card awaiting approval (or
 - No tools in the assistant: check `python run.py` is running and that the URL ends in `/mcp`.
 - Console shows the login again: re-enter the secret (cookies reset when the server restarts).
 - Fallback: the backup video.
+
+## Live mode: Instinct over WhatsApp (Contain), real Gmail test accounts
+
+Use **three Google test accounts**, never a personal one. Keep FakeMail (`SHIELD_MAIL=fake`) as the offline rehearsal and fallback; the approval flow is identical.
+
+| Account | Who can use it | Holds |
+|---|---|---|
+| Restricted demo inbox | Instinct (its Gmail connector) | Only Shield's safe publication: "Priya requested projections. Request REQ_7. Eligible document FILE_2." |
+| Sender | Shield only (`GMAIL_TOKEN`, `FOUNDER_TEST_GMAIL`) | Nothing until Shield sends |
+| Recipient | You, on stage (`INVESTOR_TEST_GMAIL`) | Receives the approved email |
+
+The projections, cap table, recipient mapping and policy stay on your laptop in Shield.
+
+**Setup.** Put `credentials.json` (OAuth client, type Desktop) in `backend/`, then:
+
+```bash
+python scripts/gmail_token.py --out token_restricted.json --scopes insert
+```
+
+Log in as the **restricted demo inbox** account when the browser opens.
+
+```bash
+python scripts/gmail_token.py --out token.json --scopes send,readonly
+```
+
+Log in as the **sender** account this time.
+
+```bash
+python scripts/seed_restricted_inbox.py --token token_restricted.json
+```
+
+Connect Instinct to the restricted demo inbox only. Use a demo Instinct profile if you can; any other connected mailbox is outside Shield's coverage.
+
+**Go/no-go first.** In WhatsApp, ask Instinct: "Check my demo inbox and prepare Priya's investor follow-up. Reply with the request ID, the document ID and a short note." It must return `REQ_7` and `FILE_2`. If it can't, use the MCP flow above instead.
+
+**Rehearse the real send once.** In `.env`, set `SHIELD_MAIL=gmail`, `FOUNDER_TEST_GMAIL` (the sender) and `INVESTOR_TEST_GMAIL` (the recipient), then:
+
+```bash
+python scripts/gmail_smoke.py --yes
+```
+
+Expect `VERIFIED`, and the email in the recipient inbox.
+
+**On stage:**
+
+1. Show the WhatsApp request and Instinct's reply (`REQ_7`, `FILE_2`, a note).
+2. In the console, click **Review a proposal from Instinct** (or open http://127.0.0.1:8000/intake). The page shows exactly what Shield published to the restricted inbox. Paste Instinct's reply and click **Review proposal**.
+3. Shield ignores everything except the IDs and the note. It resolves Priya's real address and `Projections_v3.pdf` itself, runs the checks, and opens the same review page.
+4. Click **Approve & send** once. The page shows **Verified in Gmail Sent**. Open the recipient inbox to show delivery.
+
+**What this proves, and what it doesn't.** Instinct prepared a real follow-up without access to the confidential file. Shield accounts for what it published and what it sent. It does not cover any other mailbox connected to Instinct, and it cannot inspect Instinct's internal context.

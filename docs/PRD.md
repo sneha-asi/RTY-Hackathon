@@ -83,6 +83,8 @@ The root cause is the lethal trifecta: **private data + untrusted content + a wa
 
 Many other assistants exist (ChatGPT, Claude, Gemini, Copilot, Dots); the same layer applies to them, and we use them as supporting evidence rather than the headline.
 
+**Live Contain demo (built, pending a live go/no-go test with Instinct):** Shield publishes safe lines with stable IDs (`REQ_7`, `FILE_2`) into a restricted Gmail test inbox that Instinct reads. Instinct's reply over WhatsApp is pasted into Shield's local intake as untrusted input. Shield resolves the recipient and attachment itself and runs the same checks and review page, then sends from a separate test account and verifies against Gmail Sent.
+
 **What M0 shows, honestly:** Instinct and Muse can't be placed behind a third-party layer today, because they log in with their own credentials. The hackathon demo therefore uses an MCP-capable assistant (Claude) in Enforce mode to prove the mechanism end to end, and presents Contain and Edge (how Shield reaches Instinct, Muse and OpenClaw) as the roadmap.
 
 **Demo workflow:** investor follow-ups. The demo executive is a founder answering investor document requests.

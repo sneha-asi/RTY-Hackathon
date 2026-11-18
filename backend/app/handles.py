@@ -7,7 +7,7 @@ import threading
 from .models import Handle
 from .seed import Seed, norm_addr
 
-HANDLE_RX = re.compile(r"^(CONTACT|SENDER|FILE|THREAD|EVENT)_\d+$")
+HANDLE_RX = re.compile(r"^(CONTACT|SENDER|FILE|THREAD|EVENT|REQ)_\d+$")
 
 
 class HandleRegistry:
@@ -61,6 +61,14 @@ class HandleRegistry:
 
     def note_request(self, thread_handle: str, item_id: str, category: str | None, sender_handle: str) -> None:
         self.requests[thread_handle] = {"item_id": item_id, "category": category, "sender": sender_handle}
+
+    def pin(self, handle: str, kind: str, ref: str, attrs: dict) -> Handle:
+        """Register a stable, published handle (Contain mode: IDs written into the restricted inbox)."""
+        with self._lock:
+            h = Handle(handle=handle, kind=kind, ref=ref, attrs=attrs)
+            self._by_key[(kind, ref)] = h
+            self._by_handle[handle] = h
+            return h
 
     def resolve(self, handle: str) -> Handle | None:
         if not isinstance(handle, str) or not HANDLE_RX.match(handle):

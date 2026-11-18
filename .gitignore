@@ -33,3 +33,4 @@ credentials.json
 # Shield runtime (ledger, tamperable file copies)
 runtime/
 backend/runtime/
+token_*.json

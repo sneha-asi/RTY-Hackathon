@@ -45,8 +45,8 @@ def test_sent_record_mismatch_is_unverified_not_failed(shield, monkeypatch):
     a = shield.guard.actions[tools.propose_send_document(shield, S, priya["handle"], files[("projections", 3)])["action_id"]]
     real = shield.mail.find_sent
 
-    def tampered(mid):
-        s = real(mid)
+    def tampered(mid, provider_id=None):
+        s = real(mid, provider_id=provider_id)
         s.attachments = [(s.attachments[0][0], "0" * 64)]
         return s
     monkeypatch.setattr(shield.mail, "find_sent", tampered)

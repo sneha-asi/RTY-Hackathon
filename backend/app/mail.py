@@ -67,7 +67,7 @@ class FakeMail:
                 raise TimeoutError("provider timeout after accept")
             return pid
 
-    def find_sent(self, message_id_header: str) -> SentMessage | None:
+    def find_sent(self, message_id_header: str, provider_id: str | None = None) -> SentMessage | None:
         with self._lock:
             if self.lag > 0:
                 self.lag -= 1
@@ -99,11 +99,23 @@ class GmailMail:
                 raise DefinitelyNotSent(str(e.resp.status)) from e
             raise
 
-    def find_sent(self, message_id_header: str) -> SentMessage | None:
-        mid = message_id_header.strip("<>")
-        res = self.svc.users().messages().list(userId="me", q=f"in:sent rfc822msgid:{mid}").execute()
-        msgs = res.get("messages", [])
-        if not msgs:
+    def find_sent(self, message_id_header: str, provider_id: str | None = None) -> SentMessage | None:
+        """Read the Sent record: by Gmail's own id when we have it, else by our sealed Message-ID header
+        (Gmail may replace a client-supplied Message-ID, so the provider id is tried first)."""
+        from googleapiclient.errors import HttpError
+        mid = provider_id
+        if not mid:
+            q = f"in:sent rfc822msgid:{message_id_header.strip('<>')}"
+            msgs = self.svc.users().messages().list(userId="me", q=q).execute().get("messages", [])
+            if not msgs:
+                return None
+            mid = msgs[0]["id"]
+        try:
+            msg = self.svc.users().messages().get(userId="me", id=mid, format="raw").execute()
+        except HttpError as e:
+            if e.resp.status == 404:
+                return None
+            raise
+        if "SENT" not in msg.get("labelIds", ["SENT"]):
             return None
-        raw = self.svc.users().messages().get(userId="me", id=msgs[0]["id"], format="raw").execute()["raw"]
-        return parse_raw(base64.urlsafe_b64decode(raw), msgs[0]["id"])
+        return parse_raw(base64.urlsafe_b64decode(msg["raw"]), mid)

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shield intake</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--text:#e8ebf1;--mute:#9aa3b2;--ok:#3ecf8e;--warn:#f5b74a;--bad:#ff5d5d;--info:#6aa8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px}.brand{color:var(--mute);font-size:14px;margin-bottom:14px}.brand b{color:var(--text)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+textarea,input{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px}
+textarea{min-height:120px;font-family:inherit}
+button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:16px;cursor:pointer;background:var(--info);color:#071225;margin-top:10px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute);white-space:pre-wrap}
+.bad{color:var(--bad)}.warn{color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">🛡 <b>Shield</b> · review a proposal from a closed assistant (Contain mode)</div>
+  <div id="login" class="card" hidden><p class="label">Owner login</p><input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><button onclick="login()">Log in</button></div>
+  <div id="view" hidden>
+    <div class="card"><p class="label">1 · What Shield published to the restricted inbox</p>
+      <div class="mono" id="pub">Loading…</div>
+      <p class="mono">Only these lines are in the assistant's inbox: no addresses, no file contents.</p></div>
+    <div class="card"><p class="label">2 · Paste the assistant's reply</p>
+      <textarea id="text" placeholder="e.g. Prepare REQ_7 with FILE_2. Note: Ahead of Friday"></textarea>
+      <input id="source" value="Instinct (WhatsApp, pasted)" style="margin-top:8px">
+      <button onclick="submitIt()">Review proposal</button>
+      <p class="mono">Untrusted input: Shield takes only the request ID, the document ID and a short note. It resolves the real recipient and attachment itself and runs the same checks.</p>
+      <div id="result"></div></div>
+  </div>
+</main>
+<script>
+const $=x=>document.getElementById(x);const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:$('secret').value})});if(r.ok)load();else alert('Wrong secret')}
+async function load(){const r=await fetch('/api/mirror/publication');if(r.status===401){$('login').hidden=false;$('view').hidden=true;return}
+  $('login').hidden=true;$('view').hidden=false;const p=await r.json();$('pub').textContent='Subject: '+p.subject+'\n\n'+p.body}
+async function submitIt(){const r=await fetch('/api/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('text').value,source:$('source').value})});
+  const d=await r.json();const ig=(d.parsed&&d.parsed.ignored||[]).map(x=>`<div class="warn">Ignored ${esc(x)}</div>`).join('');
+  if(d.error){$('result').innerHTML=`<p class="bad">${esc(d.error)}</p>${ig}`;return}
+  if(d.review_url){location.href='/review/'+d.action_id;return}
+  $('result').innerHTML=`<p class="bad">${esc(d.state)}: ${esc(d.status_text)}</p>${ig}`}
+load();
+</script>
+</body>
+</html>
