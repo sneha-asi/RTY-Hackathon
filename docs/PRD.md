@@ -67,12 +67,19 @@ The root cause is the lethal trifecta: **private data + untrusted content + a wa
 
 ## 1. Problem (who and why)
 
-**Who:** executives who delegate to a personal AI assistant: founders, CXOs, VPs, fund partners. Assistants like Instinct, Muse and OpenClaw ask for access to *everything*: email, calendar, files, messages, browser, contacts, bank accounts, the laptop itself. We define the user by two properties, not a title:
+**Who:** executives (founders, CXOs, VPs, fund partners), because they deal with a lot of sensitive information, much of it other people's: investor terms, cap tables, hiring and layoff plans, board matters, customer contracts. Their messages also carry authority: a sent email commits the company or shares a data room. A leak or a wrong send costs them, and third parties, far more than it costs a casual user. Today their choice is "give the assistant everything" or "don't use one".
 
-1. **Their accounts hold other people's confidential data:** investors, employees, customers, the board.
-2. **Their messages carry authority:** a sent email commits the company, shares a data room or moves money.
+**The assistants we focus on: Instinct, Muse and OpenClaw.** Each asks for broad access to email, calendar, files and more, and each has already shown what goes wrong:
 
-For them a leak or a wrong send has legal, financial and reputational cost, much of it borne by third parties. They also tend to run personal assistants on personal accounts, outside what company IT protects. Today their choice is "give it everything" or "don't use one".
+| Assistant | What it takes | What went wrong | Where Shield can sit (§4) |
+|---|---|---|---|
+| **Instinct** | Gmail, calendar, files via its own login; "perpetual and irrevocable" licence to user materials [V] | Emailed an investor "without checking with me first"; kept summarising an inbox after Gmail was disconnected [V] | Closed, holds its own login → **Contain** (mirror inbox) + **Watch & revoke** |
+| **Meta Muse** | Desktop agent with broad account and device access [V] | Mac zero-day: "trivial to turn Muse into the ultimate backdoor" [L]; blocked by Amazon [L] | Runs on the user's machine → **Edge** + **Contain** + **Watch & revoke** |
+| **OpenClaw** | Agent with full read/write to inbox and tools, run by the user [L] | Mass-deleted a security researcher's inbox [L] | User-run, accepts tools → **Enforce** where its tools can point at Shield [U], else **Edge** |
+
+Many other assistants exist (ChatGPT, Claude, Gemini, Copilot, Dots); the same layer applies to them, and we use them as supporting evidence rather than the headline.
+
+**What M0 shows, honestly:** Instinct and Muse can't be placed behind a third-party layer today, because they log in with their own credentials. The hackathon demo therefore uses an MCP-capable assistant (Claude) in Enforce mode to prove the mechanism end to end, and presents Contain and Edge (how Shield reaches Instinct, Muse and OpenClaw) as the roadmap.
 
 **Founders are the first segment:** the earliest adopters of personal assistants among executives, holding the most sensitive data in the company (term sheets, cap tables, hiring, board matters), with no IT or security team behind them.
 
@@ -460,7 +467,7 @@ All P0 unless marked.
 
 ### 10.10 3-minute demo script
 
-1. **The user problem (25s):** "I'm a founder. My inbox has investor requests next to my cap table, a layoff plan, my PAN and a medical note. I want an assistant to handle investor follow-ups, but assistants ask for access to everything, and Copilot, Gemini and ChatGPT have each been hijacked by content they read. Instinct emailed an investor without asking."
+1. **The user problem (25s):** "I'm a founder. My inbox has investor requests next to my cap table, a layoff plan, my PAN and a medical note. I want an assistant to handle investor follow-ups. Instinct, Muse and OpenClaw ask for access to everything, and each has gone wrong: Instinct emailed an investor without asking, OpenClaw deleted an inbox, Muse shipped with a backdoor-grade zero-day." Today's demo uses Claude over MCP, because Instinct and Muse can't yet be put behind a third-party layer.
 2. **Side by side (30s):** same request, same model. Two columns, both measured: **sensitive values exposed to the model** (Direct vs Shielded) and **task completed?** (Direct vs Shielded). Numbers shown exactly as the run produced them.
 3. **With Shield (75s):** *"Handle my investor follow-ups"*, with "send Priya the projections" as the concrete case.
    - The model sees the investor requests as handles and purpose-filtered summaries; everything unrelated shows only as **withheld** counts; the seeded malicious email is quarantined.

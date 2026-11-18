@@ -13,11 +13,11 @@ A layer the user owns that sits between AI assistants and **everything they can 
 - **B3** People use several assistants. So one policy applies across all of them.
 - **B4** Trust needs evidence. So Shield shows what was released, withheld, approved and verified.
 - **B5** Friction kills delegation. So only outward and irreversible actions are gated.
-- **B6** The pain concentrates where a mistake is expensive: **executives** (founders, CXOs, VPs, fund partners), whose accounts hold other people's confidential data and whose messages carry authority. Everyone faces the same attack, but a student's worst case is mostly personal and they rarely pay. **Founders are the first segment** (earliest adopters, no IT team behind them), with one job: *"Handle my investor follow-ups."*
+- **B6** Target **executives** (founders, CXOs, VPs, fund partners), because they deal with a lot of sensitive information, much of it other people's, and their messages carry authority. **Founders are the first segment**, with one job: *"Handle my investor follow-ups."*
 
 ## The problem
 
-Assistants like Instinct, Muse and OpenClaw ask for access to almost everything. Content they read (an email, an invite, a doc) can carry hidden instructions. An assistant that combines **private data + untrusted content + a way to act outward** can be steered against its user: the "lethal trifecta". Copilot, Gemini and ChatGPT have each been hijacked through content they read; Instinct emailed an investor unasked. A model can't be made to reliably refuse what it reads, so Shield doesn't depend on the model.
+**Instinct, Muse and OpenClaw** ask for access to almost everything, and each has gone wrong: Instinct emailed an investor without asking, OpenClaw mass-deleted an inbox, Muse shipped with a backdoor-grade zero-day. Content these assistants read (an email, an invite, a doc) can carry hidden instructions. An assistant that combines **private data + untrusted content + a way to act outward** can be steered against its user: the "lethal trifecta". Copilot, Gemini and ChatGPT have each been hijacked this way too. A model can't be made to reliably refuse what it reads, so Shield doesn't depend on the model.
 
 ## Technical first principles: the invariants
 
@@ -33,6 +33,16 @@ Assistants like Instinct, Muse and OpenClaw ask for access to almost everything.
 | I8 | Decisions recorded without content | Receipts: "Shield released the cap table 0 times and withheld it twice today." |
 | I9 | Fail closed | Any error blocks or withholds |
 | I10 | Claims follow the access path | See below |
+
+## Reaching Instinct, Muse and OpenClaw
+
+| Assistant | How Shield reaches it |
+|---|---|
+| Instinct (closed, own login) | Contain via a mirror inbox; watch & revoke |
+| Muse (desktop agent) | Edge proxy; contain; watch & revoke |
+| OpenClaw (user-run) | Enforce if its tools point at Shield; otherwise edge |
+
+Today's demo uses Claude over MCP to prove the mechanism end to end; these three are the roadmap.
 
 ## Where the guarantees hold (I10)
 
