@@ -6,11 +6,11 @@ from reportlab.pdfgen import canvas
 
 OUT = Path(__file__).parent / "files"
 DOCS = {
-    "Projections_v2.pdf": ["Axon Labs - Financial Projections v2 (SUPERSEDED)", "SYNTHETIC DEMO DATA",
+    "Projections_v2.pdf": ["Kestrel Labs - Financial Projections v2 (SUPERSEDED)", "SYNTHETIC DEMO DATA",
                            "FY27 revenue: Rs 4.0 Cr", "FY28 revenue: Rs 11.0 Cr"],
-    "Projections_v3.pdf": ["Axon Labs - Financial Projections v3 (LATEST)", "SYNTHETIC DEMO DATA",
+    "Projections_v3.pdf": ["Kestrel Labs - Financial Projections v3 (LATEST)", "SYNTHETIC DEMO DATA",
                            "FY27 revenue: Rs 4.6 Cr", "FY28 revenue: Rs 13.5 Cr", "Confidential - NDA only"],
-    "Teaser_Deck.pdf": ["Axon Labs - Teaser", "SYNTHETIC DEMO DATA",
+    "Teaser_Deck.pdf": ["Kestrel Labs - Teaser", "SYNTHETIC DEMO DATA",
                         "The AI talks. The code decides. Nothing is done until it's proven."],
 }
 

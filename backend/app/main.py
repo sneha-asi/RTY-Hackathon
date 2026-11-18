@@ -82,7 +82,28 @@ def state(shield_owner: str | None = Cookie(default=None)):
                                                     "status_text": shield.guard.status_text(a)} for a in actions],
         "model_view": shield.model_view[-20:] if authed else [],
         "mail_backend": shield.settings.mail_backend,
+        "harness": HARNESS,
     }
+
+
+HARNESS: dict = {"status": "not run"}
+
+
+@app.post("/api/harness/run")
+async def harness_run(req: Request, shield_owner: str | None = Cookie(default=None)):
+    if not _user(shield_owner):
+        raise HTTPException(401, "login required")
+    from . import harness
+    body = await req.json()
+    runner = body.get("runner", "scripted")
+    HARNESS.clear()
+    HARNESS["status"] = "running"
+    try:
+        HARNESS.update(await asyncio.to_thread(harness.run_comparison, runner))
+        HARNESS["status"] = "done"
+    except Exception as e:  # e.g. no API key for the model runner
+        HARNESS.update({"status": "error", "error": f"{type(e).__name__}: {e}"})
+    return HARNESS
 
 
 @app.post("/api/actions/{aid}/approve")
