@@ -29,7 +29,7 @@ A layer the user owns that sits between AI assistants and **everything they can 
 | I4 | Code chooses targets | Handles resolve to the user's contacts and file catalogue; raw addresses are refused |
 | I5 | No outbound channel in model text | No URLs, images, raw identifiers or sensitive values in the note |
 | I6 | User approves exact sealed payload | Recipients (To/Cc/Bcc), message bytes and attachment hash are sealed; Shield sends the same bytes it checked |
-| I7 | Done is a provider fact | Only VERIFIED counts; uncertain delivery shows VERIFICATION_PENDING and is never resent automatically |
+| I7 | Done is a provider fact | Only VERIFIED counts; uncertain delivery shows VERIFICATION_PENDING and is never resent automatically; if still unconfirmed after ~2 min it shows UNVERIFIED ("may have been sent") |
 | I8 | Decisions recorded without content | Receipts: "Shield released the cap table 0 times and withheld it twice today." |
 | I9 | Fail closed | Any error blocks or withholds |
 | I10 | Claims follow the access path | See below |

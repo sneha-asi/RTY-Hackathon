@@ -12,6 +12,8 @@
 
 ## 1. What this system does
 
+**For whom:** executives (founders first), because they deal with a lot of sensitive information, much of it other people's (PRD §1). **Against what:** personal assistants that ask for access to everything, with **Instinct, Muse and OpenClaw** as the focus.
+
 Shield sits between a person's AI assistants and the accounts those assistants can reach. Two kinds of traffic pass through it, and each has one path:
 
 | Traffic | Path | Result |
@@ -96,7 +98,18 @@ The full product has four modes (PRD §4). M0 implements mode 1.
 | 3. Contain (supported mirror for closed assistants) | Roadmap | Minimisation by construction; mirror sends gated |
 | 4. Watch and revoke | Roadmap | After-the-fact detection, as far as each provider exposes |
 
+How each focus assistant is reached (PRD §1):
+
+| Assistant | Mode(s) | M0 |
+|---|---|---|
+| Instinct (closed, own login) | 3 Contain (mirror inbox) + 4 Watch & revoke | Roadmap |
+| Muse (desktop agent) | 2 Edge + 3 Contain + 4 Watch & revoke | Roadmap |
+| OpenClaw (user-run) | 1 Enforce if its tools can point at Shield [U]; else 2 Edge | Roadmap |
+| Claude (MCP connector) | 1 Enforce | **Demo client**: proves the mechanism end to end |
+
 ## 6. Core flows
+
+The demo runs these flows for one request, *"Handle my investor follow-ups"*; the full step-by-step trace is in LLD §17.1.
 
 **Read**
 ```
