@@ -1,3 +1,6 @@
-[{"id":"proj_v2","category":"projections","version":2,"path":"files/Projections_v2.pdf","requires_nda":true},
- {"id":"proj_v3","category":"projections","version":3,"path":"files/Projections_v3.pdf","requires_nda":true},
- {"id":"teaser","category":"teaser","version":1,"path":"files/Teaser_Deck.pdf","requires_nda":false}]
+[{"id":"proj_v2","category":"projections","version":2,"path":"files/Projections_v2.pdf","requires_nda":true,"sensitivity":["financial"],"shareable":true},
+ {"id":"proj_v3","category":"projections","version":3,"path":"files/Projections_v3.pdf","requires_nda":true,"sensitivity":["financial"],"shareable":true},
+ {"id":"teaser","category":"teaser","version":1,"path":"files/Teaser_Deck.pdf","requires_nda":false,"sensitivity":[],"shareable":true},
+ {"id":"cap_table","category":"cap_table","version":1,"path":"files/Cap_Table.txt","requires_nda":true,"sensitivity":["financial","deal"],"shareable":false},
+ {"id":"layoff_plan","category":"hr_plan","version":1,"path":"files/Layoff_Plan.txt","requires_nda":true,"sensitivity":["hr"],"shareable":false},
+ {"id":"eng_onboarding","category":"engineering","version":1,"path":"files/Eng_Onboarding.txt","requires_nda":false,"sensitivity":["secrets"],"shareable":false}]

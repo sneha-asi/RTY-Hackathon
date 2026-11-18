@@ -1,4 +1,6 @@
-[{"id":"c1","name":"Priya Rao","org":"Northbeam Ventures","email":"<<INVESTOR_TEST_GMAIL>>","role":"investor","nda":true},
- {"id":"c2","name":"Riya Shah","org":"Acme","email":"<<SECOND_TEST_EMAIL>>","role":"customer","nda":false},
- {"id":"c3","name":"Ramesh Iyer","org":"Kirana Cloud","email":"<<THIRD_TEST_EMAIL>>","role":"customer","nda":false},
- {"id":"c4","name":"Karan Mehta","org":"Angel","email":"<<FOURTH_TEST_EMAIL>>","role":"investor","nda":false}]
+[{"id":"c1","name":"Priya Rao","org":"Northbeam Ventures","email":"<<INVESTOR_TEST_GMAIL>>","role":"investor","nda":true,"trusted":false},
+ {"id":"c2","name":"Riya Shah","org":"Acme","email":"<<SECOND_TEST_EMAIL>>","role":"customer","nda":false,"trusted":false},
+ {"id":"c3","name":"Ramesh Iyer","org":"Kirana Cloud","email":"<<THIRD_TEST_EMAIL>>","role":"customer","nda":false,"trusted":false},
+ {"id":"c4","name":"Karan Mehta","org":"Angel","email":"<<FOURTH_TEST_EMAIL>>","role":"investor","nda":false,"trusted":false},
+ {"id":"c5","name":"Ananya Desai","org":"Own company","email":"<<COFOUNDER_TEST_EMAIL>>","role":"cofounder","nda":true,"trusted":true},
+ {"id":"c6","name":"Vikram Joshi","org":"Joshi & Co","email":"<<ACCOUNTANT_TEST_EMAIL>>","role":"accountant","nda":true,"trusted":false}]

@@ -1,13 +1,15 @@
-"""Internal models. Stable regardless of what the voice platform sends."""
+"""Shield data shapes (LLD §3). Every model-facing type is built by Shield (I1)."""
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+Label = Literal["financial", "legal", "hr", "health", "identity_ids", "secrets", "deal"]
 
-# ---------- seed data ----------
+
+# ---------- seed ----------
 class Contact(BaseModel):
     id: str
     name: str
@@ -15,6 +17,7 @@ class Contact(BaseModel):
     email: str
     role: str
     nda: bool
+    trusted: bool = False
 
     @property
     def first_name(self) -> str:
@@ -27,126 +30,127 @@ class FileRecord(BaseModel):
     version: int
     path: str
     requires_nda: bool
+    sensitivity: list[str] = Field(default_factory=list)
+    shareable: bool = True
     sha256: str = ""
     filename: str = ""
 
     @property
     def label(self) -> str:
         if self.category == "teaser":
-            return "the Teaser Deck"
+            return "Teaser Deck"
         return f"{self.category.replace('_', ' ').title()} v{self.version}"
 
 
-class Founder(BaseModel):
-    name: str
-    company: str
-    registered_numbers: list[str]
-    pin: str
-    sender_email: str
-    policies: dict[str, dict[str, bool]]
+class Item(BaseModel):
+    """A normalised source item (email or event)."""
+    id: str
+    kind: Literal["email", "event"]
+    thread_id: str | None = None
+    sender: str
+    to: list[str] = Field(default_factory=list)
+    subject: str = ""
+    body_html: str = ""
+    ts: str = ""
+    attachments: list[str] = Field(default_factory=list)
+    start: str | None = None
+    end: str | None = None
 
 
-# ---------- extraction: a proposal, untrusted ----------
-CommitmentType = Literal["send_document", "follow_up", "intro", "other"]
+# ---------- read path ----------
+class Handle(BaseModel):
+    handle: str
+    kind: Literal["CONTACT", "SENDER", "FILE", "THREAD", "EVENT"]
+    ref: str  # SERVER ONLY: contact id / raw address / file id / thread id
+    attrs: dict[str, Any] = Field(default_factory=dict)
 
 
-class Commitment(BaseModel):
-    type: CommitmentType
-    person_name: str = ""
-    person_org: str | None = None
-    doc_category: str | None = None
-    second_person_name: str | None = None
-    due_phrase: str | None = None
-    due_iso: str | None = None
-    note: str = ""
+class ReleasedItem(BaseModel):
+    handle: str
+    kind: str
+    sender: str  # handle
+    intent: str
+    requested_category: str | None = None
+    due: str | None = None
+    summary: str | None = None
+    status: Literal["released", "quarantined"] = "released"
+    reason: str | None = None
 
 
-class Extraction(BaseModel):
-    commitments: list[Commitment] = Field(default_factory=list)
-    unclear: list[str] = Field(default_factory=list)
-    suspicious: list[str] = Field(default_factory=list)
-
-
-# ---------- actions ----------
+# ---------- write path ----------
 class State(str, Enum):
     PROPOSED = "PROPOSED"
     BLOCKED = "BLOCKED"
-    NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
-    DISCARDED = "DISCARDED"
-    READ_BACK = "READ_BACK"
-    CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    REJECTED = "REJECTED"
+    APPROVED = "APPROVED"
     EXECUTING = "EXECUTING"
+    VERIFICATION_PENDING = "VERIFICATION_PENDING"
     VERIFIED = "VERIFIED"
     FAILED = "FAILED"
+    UNVERIFIED = "UNVERIFIED"
 
 
-TERMINAL = {State.BLOCKED, State.DISCARDED, State.CANCELLED, State.VERIFIED, State.FAILED}
-
-# The only legal transitions. Anything else raises: a bug must never look like progress.
 TRANSITIONS: dict[State, set[State]] = {
-    State.PROPOSED: {State.BLOCKED, State.NEEDS_CLARIFICATION, State.READ_BACK},
-    State.NEEDS_CLARIFICATION: {State.DISCARDED},
-    State.READ_BACK: {State.CONFIRMED, State.CANCELLED, State.FAILED, State.BLOCKED, State.DISCARDED},
-    State.CONFIRMED: {State.EXECUTING, State.FAILED},
-    State.EXECUTING: {State.VERIFIED, State.FAILED},
+    State.PROPOSED: {State.BLOCKED, State.AWAITING_APPROVAL},
+    State.AWAITING_APPROVAL: {State.APPROVED, State.REJECTED},
+    State.APPROVED: {State.EXECUTING, State.FAILED},
+    State.EXECUTING: {State.VERIFIED, State.FAILED, State.VERIFICATION_PENDING},
+    State.VERIFICATION_PENDING: {State.VERIFIED, State.FAILED, State.UNVERIFIED},
 }
+TERMINAL = {State.BLOCKED, State.REJECTED, State.VERIFIED, State.FAILED, State.UNVERIFIED}
+SUCCESS = {State.VERIFIED}
+CHECKS = ["WHO", "WHAT", "POLICY", "CONTENT", "LOCK"]
 
-CHECK_ORDER: list[str] = ["CALLER", "WHO", "WHAT", "POLICY", "LOCK", "VERIFIED"]
+
+class IllegalTransition(Exception):
+    pass
 
 
 class Check(BaseModel):
-    status: Literal["pending", "pass", "fail", "warn", "na"] = "pending"
-    reason: str = ""
+    name: str
+    status: Literal["pending", "pass", "warn", "fail"] = "pending"
+    detail: str = ""
 
 
 class Payload(BaseModel):
-    """Exactly what the founder approves. Hashed into payload_hash."""
-    type: str
-    recipient_contact_id: str | None = None
-    recipient_email: str | None = None
-    subject: str = ""
-    body: str = ""
+    """Exactly what the user approves (LLD §5.3)."""
+    type: Literal["send_document"] = "send_document"
+    recipient_contact_ids: list[str]
+    to: list[str]
+    cc: list[str] = Field(default_factory=list)
+    bcc: list[str] = Field(default_factory=list)
+    sender: str
+    subject: str
+    body: str
     file_id: str | None = None
-    file_sha256: str | None = None
-    due_date: str | None = None
+    file_name: str | None = None
+    attachment_sha256: str | None = None
+    message_id: str
+    date: str
+    boundary: str
+    message_sha256: str = ""
 
 
 class Action(BaseModel):
     id: str
-    call_id: str
+    session_id: str
     type: str
     state: State = State.PROPOSED
+    args: dict[str, Any] = Field(default_factory=dict)
     payload: Payload | None = None
     payload_hash: str | None = None
-    readback: str = ""
-    readback_delivered_at: str | None = None
-    clarification: str | None = None
-    clarification_candidates: list[str] = Field(default_factory=list)
-    commitment: Commitment | None = None
-    checks: dict[str, Check] = Field(default_factory=lambda: {c: Check() for c in CHECK_ORDER})
+    checks: list[Check] = Field(default_factory=lambda: [Check(name=c) for c in CHECKS])
+    warnings: list[str] = Field(default_factory=list)
     reason: str = ""
-    result_message: str = ""
+    display: dict[str, str] = Field(default_factory=dict)  # names/labels for status text (no addresses)
+    send_attempted: bool = False
     sent_message_id: str | None = None
-    display: dict[str, str] = Field(default_factory=dict)
+    verification: dict[str, Any] | None = None
+    verify_attempts: int = 0
+    approved_by: str | None = None
     created_at: str = ""
+    updated_at: str = ""
 
-
-class CallSession(BaseModel):
-    call_id: str
-    caller_number: str | None = None
-    direction: Literal["inbound", "outbound"] = "inbound"
-    number_registered: bool = False
-    verified: bool = False
-    pin_attempts: int = 0
-    locked: bool = False
-    transcript: list[dict[str, str]] = Field(default_factory=list)
-    created_at: str = ""
-
-
-class Reminder(BaseModel):
-    id: str
-    action_id: str
-    contact_id: str | None
-    due_date: str
-    text: str
+    def check(self, name: str) -> Check:
+        return next(c for c in self.checks if c.name == name)

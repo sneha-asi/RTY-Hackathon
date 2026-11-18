@@ -1,0 +1,3 @@
+SYNTHETIC DEMO DATA - Engineering onboarding
+Staging API key: sk-demoX9fK2mQ7rT4vB8nL3pZ6wY1cH5jD0aEe
+Ask the platform team for production access.
