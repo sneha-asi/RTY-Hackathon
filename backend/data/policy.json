@@ -2,7 +2,8 @@
   "investor_followups": {
     "enabled": true,
     "description": "Handle investor follow-ups: share requested investor documents with known investors.",
-    "purposes": ["share_document", "schedule"],
+    "purposes": ["share_document", "schedule", "reply"],
+    "actions": ["send_document", "reply"],
     "recipient_roles": ["investor"],
     "categories": ["projections", "teaser"],
     "nda_fallback": "teaser",

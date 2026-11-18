@@ -90,7 +90,7 @@ def test_mcp_has_no_send_or_approve_tool():
     import asyncio
     from app.main import mcp
     names = {t.name for t in asyncio.run(mcp.list_tools())}
-    assert names == {"search", "list_files", "free_slots", "propose_send_document", "action_status"}
+    assert names == {"search", "read", "list_files", "free_slots", "propose_send_document", "propose_reply", "action_status"}
 
 
 def test_owner_data_requires_login():

@@ -27,6 +27,10 @@ SHIELD_SCHEMAS = [
      "input_schema": {"type": "object", "properties": {"category": {"type": "string"}}}},
     {"name": "propose_send_document", "description": "Propose answering a document request (THREAD_n) with a file (FILE_n). The user approves in Shield.",
      "input_schema": {"type": "object", "properties": {"request": {"type": "string"}, "file": {"type": "string"}, "note": {"type": "string"}}, "required": ["request", "file"]}},
+    {"name": "read", "description": "Read one thread (THREAD_n from search) as a summary.",
+     "input_schema": {"type": "object", "properties": {"purpose": {"type": "string"}, "thread": {"type": "string"}}, "required": ["purpose", "thread"]}},
+    {"name": "propose_reply", "description": "Propose a plain-text reply to a thread (THREAD_n). The user approves in Shield.",
+     "input_schema": {"type": "object", "properties": {"thread": {"type": "string"}, "text": {"type": "string"}}, "required": ["thread", "text"]}},
     {"name": "action_status", "description": "State of a proposed action; relay the status text.",
      "input_schema": {"type": "object", "properties": {"action_id": {"type": "string"}}, "required": ["action_id"]}},
 ]
@@ -135,10 +139,11 @@ def run_model(mode: str, model: str, max_turns: int = 12) -> dict:
                 if mode == "direct":
                     out = d.call(block.name, dict(block.input))
                 else:
-                    fn = {"search": tools.search, "list_files": tools.list_files,
+                    fn = {"search": tools.search, "list_files": tools.list_files, "read": tools.read,
+                          "propose_reply": tools.propose_reply,
                           "propose_send_document": tools.propose_send_document, "action_status": tools.action_status}[block.name]
                     out = fn(sh, sid, **dict(block.input))
-                    if block.name == "propose_send_document" and out.get("state") == "AWAITING_APPROVAL":
+                    if block.name.startswith("propose_") and out.get("state") == "AWAITING_APPROVAL":
                         a = sh.guard.actions[out["action_id"]]
                         if all(c.status in ("pass", "warn") for c in a.checks):
                             sh.guard.approve(a.id, "owner", a.payload_hash)  # simulated human approving what passed

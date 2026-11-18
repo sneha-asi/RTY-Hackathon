@@ -115,7 +115,7 @@ class Check(BaseModel):
 
 class Payload(BaseModel):
     """Exactly what the user approves (LLD §5.3)."""
-    type: Literal["send_document"] = "send_document"
+    type: Literal["send_document", "reply"] = "send_document"
     recipient_contact_ids: list[str]
     to: list[str]
     cc: list[str] = Field(default_factory=list)

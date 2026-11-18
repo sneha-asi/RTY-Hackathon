@@ -35,6 +35,11 @@ def build_mcp(shield: Shield) -> FastMCP:
         return tools.search(shield, _sid(ctx), purpose, query)
 
     @mcp.tool()
+    def read(purpose: str, thread: str, ctx: Context = None) -> dict:
+        """Read one thread (THREAD_n already returned by search) as a summary with structured fields."""
+        return tools.read(shield, _sid(ctx), purpose, thread)
+
+    @mcp.tool()
     def list_files(category: str = "", ctx: Context = None) -> dict:
         """List shareable files as FILE_n handles with category, version, latest and requires_nda. Never contents."""
         return tools.list_files(shield, _sid(ctx), category)
@@ -49,6 +54,12 @@ def build_mcp(shield: Shield) -> FastMCP:
         """Propose answering a document request (THREAD_n from search) with a file (FILE_n). Shield takes the recipient
         from the request, checks the file matches what was asked for, and asks the user to approve. Note: plain text, no links."""
         return tools.propose_send_document(shield, _sid(ctx), request, file, note)
+
+    @mcp.tool()
+    def propose_reply(thread: str, text: str, ctx: Context = None) -> dict:
+        """Propose a plain-text reply to a thread (THREAD_n). Shield takes the recipient from the thread and asks the
+        user to approve. No links, images, addresses or sensitive values in the text."""
+        return tools.propose_reply(shield, _sid(ctx), thread, text)
 
     @mcp.tool()
     def action_status(action_id: str, ctx: Context = None) -> dict:

@@ -20,7 +20,10 @@ from .mail import DefinitelyNotSent
 from .models import TERMINAL, TRANSITIONS, Action, IllegalTransition, Payload, State
 from .seed import Seed, norm_addr, sha256_bytes
 
-URL_RX = re.compile(r"https?://|www\.|\b[\w-]+\.(com|io|net|co|ai|in|org)\b/?", re.I)
+URL_RX = re.compile(
+    r"https?://|www\.|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}/"  # any scheme, www., or domain followed by a path
+    r"|\b(?:[a-z0-9-]+\.)+(?:com|io|net|co|ai|in|org|app|dev|me|xyz|link|ly|gl|to|so|sh|site|page|cloud|biz|info|us|uk)\b",
+    re.I)
 IMG_RX = re.compile(r"!\[|<img", re.I)
 HANDLE_IN_TEXT = re.compile(r"\b(CONTACT|SENDER|FILE|THREAD|EVENT)_\d+\b")
 MAX_NOTE = 1000
@@ -43,6 +46,26 @@ def build_mime(p: Payload, attachment: bytes | None) -> bytes:
         m.add_attachment(attachment, maintype="application", subtype=sub, filename=p.file_name)
         m.set_boundary(p.boundary)
     return m.as_bytes()
+
+
+def content_problems(text: str, max_len: int) -> list[str]:
+    """CONTENT check (I5): model-written text may not carry an outbound channel or sensitive values."""
+    problems = []
+    if URL_RX.search(text):
+        problems.append("external link in outgoing text")
+    if IMG_RX.search(text):
+        problems.append("image in outgoing text")
+    if HANDLE_IN_TEXT.search(text):
+        problems.append("handle leaked into text")
+    spans = labels.detect(text)
+    if any(sp.detector == "email" for sp in spans):
+        problems.append("raw address in text")
+    sens = sorted({sp.detector.upper() for sp in spans if sp.detector != "email"})
+    if sens:
+        problems.append(f"sensitive value in text: {', '.join(sens)}")
+    if len(text) > max_len:
+        problems.append("too long")
+    return problems
 
 
 def _norm_body(b: str) -> str:
@@ -179,21 +202,7 @@ class Guard:
             policy.status = "pass"
             policy.detail = f"{reg.policy_name} · " + ("financial, NDA on file" if "financial" in frec.sensitivity else "no restriction")
         # CONTENT (I5)
-        problems = []
-        if URL_RX.search(note):
-            problems.append("external link in outgoing text")
-        if IMG_RX.search(note):
-            problems.append("image in outgoing text")
-        if HANDLE_IN_TEXT.search(note):
-            problems.append("handle leaked into text")
-        spans = labels.detect(note)
-        if any(s.detector == "email" for s in spans):
-            problems.append("raw address in text")
-        sens = sorted({s.detector.upper() for s in spans if s.detector != "email"})
-        if sens:
-            problems.append(f"sensitive value in text: {', '.join(sens)}")
-        if len(note) > MAX_NOTE:
-            problems.append("too long")
+        problems = content_problems(note, MAX_NOTE)
         content.status, content.detail = ("fail", "; ".join(problems)) if problems else ("pass", "clean")
 
         failed = [c for c in a.checks if c.status == "fail"]
@@ -206,20 +215,76 @@ class Guard:
         if note.strip():
             body += f"\n{note.strip()}\n"
         body += f"\n— {self.founder_name}\n"
-        p = Payload(recipient_contact_ids=[contact.id], to=[contact.email], sender=self.sender_addr,
-                    subject=frec.label, body=body, file_id=frec.id, file_name=frec.filename,
+        return self._seal_and_queue(a, "send_document", contact, frec.label, body, frec, {"file": frec.label})
+
+    def _seal_and_queue(self, a: Action, kind: str, contact, subject: str, body: str, frec, display: dict) -> Action:
+        """Build the exact outgoing MIME once, seal recipient + bytes + attachment hash, queue for approval (I6)."""
+        lock = a.check("LOCK")
+        p = Payload(type=kind, recipient_contact_ids=[contact.id], to=[contact.email], sender=self.sender_addr,
+                    subject=subject, body=body, file_id=frec.id if frec else None,
+                    file_name=frec.filename if frec else None,
                     message_id=f"<{a.id}.{uuid.uuid4().hex[:6]}@shield.local>",
                     date=format_datetime(datetime.now(TZ)), boundary=f"shield-{a.id}")
-        data = self.seed.read_file_once(frec)
-        p.attachment_sha256 = sha256_bytes(data)
+        data = self.seed.read_file_once(frec) if frec else None
+        p.attachment_sha256 = sha256_bytes(data) if data is not None else None
         p.message_sha256 = sha256_bytes(build_mime(p, data))
         if p.cc or p.bcc or len(p.to) != 1:  # M0 contract: exactly one To recipient
             lock.status, lock.detail = "fail", "M0 supports exactly one To recipient"
             return self._to(a, State.BLOCKED, "LOCK: M0 supports exactly one To recipient")
         a.payload, a.payload_hash = p, seal(p)
-        a.display = {"recipient": contact.name, "file": frec.label}
+        a.display = {"recipient": contact.name, **display}
         lock.status, lock.detail = "pass", f"sealed {a.payload_hash[:12]}"
         return self._to(a, State.AWAITING_APPROVAL)
+
+    # ---------- propose_reply (PRD §10.3) ----------
+    def propose_reply(self, session_id: str, reg: HandleRegistry, thread: str, text: str) -> Action:
+        """Reply to a thread released in this session. Recipient comes from the thread; text is model-written,
+        so CONTENT is the main gate (the EchoLeak channel). No attachment."""
+        a = Action(id="act_" + uuid.uuid4().hex[:8], session_id=session_id, type="reply", policy=reg.policy_name,
+                   request_handle=thread if isinstance(thread, str) else None,
+                   args={"thread": thread, "text": text}, created_at=now_iso(), updated_at=now_iso())
+        self.actions[a.id] = a
+        self.ledger.emit("transition", session_id=session_id, action_id=a.id, frm=None, to=State.PROPOSED.value, reason="")
+        try:
+            who, what, policy, content = (a.check(n) for n in ("WHO", "WHAT", "POLICY", "CONTENT"))
+            pol, contact = reg.policy, None
+            t = reg.threads.get(thread) if isinstance(thread, str) else None
+            if isinstance(thread, str) and ("@" in thread or "://" in thread):
+                who.status, who.detail = "fail", "raw address not accepted; use a handle"
+            elif t is None:
+                who.status, who.detail = "fail", "not a thread released in this session"
+            else:
+                sh = reg.resolve(t["sender"])
+                if sh is None or sh.kind == "SENDER":
+                    who.status, who.detail = "fail", "unknown recipient: add them as a contact first"
+                else:
+                    contact = self.seed.contact(sh.ref)
+                    if contact.role not in pol.get("recipient_roles", []):
+                        who.status, who.detail = "fail", f"{contact.role} is outside policy '{reg.policy_name}'"
+                        contact = None
+                    else:
+                        who.status, who.detail = "pass", f"{contact.name} · {contact.org} (from {thread})"
+            what.status, what.detail = "pass", "text reply, no attachment"
+            if "reply" not in pol.get("actions", []):
+                policy.status, policy.detail = "fail", f"replies are outside policy '{reg.policy_name}'"
+            else:
+                policy.status, policy.detail = "pass", f"{reg.policy_name} · reply"
+            text = text or ""
+            problems = content_problems(text, MAX_NOTE) or ([] if text.strip() else ["empty reply"])
+            content.status, content.detail = ("fail", "; ".join(problems)) if problems else ("pass", "clean")
+            failed = [c for c in a.checks if c.status == "fail"]
+            if failed:
+                a.check("LOCK").status, a.check("LOCK").detail = "fail", "not sealed"
+                return self._to(a, State.BLOCKED, f"{failed[0].name}: {failed[0].detail}")
+            item = next(i for i in self.seed.items if i.id == t["item_id"])
+            subject = item.subject if item.subject.lower().startswith("re:") else f"Re: {item.subject}"
+            body = f"Hi {contact.first_name},\n\n{text.strip()}\n\n— {self.founder_name}\n"
+            return self._seal_and_queue(a, "reply", contact, subject, body, None, {"file": "your reply"})
+        except Exception as e:  # fail closed (I9)
+            for c in a.checks:
+                if c.status == "pending":
+                    c.status, c.detail = "fail", "not evaluated"
+            return self._to(a, State.BLOCKED, f"internal: {type(e).__name__}")
 
     # ---------- approve / reject ----------
     def reject(self, aid: str, user: str | None) -> Action:
@@ -243,9 +308,9 @@ class Guard:
             a.approved_by = user
             self._to(a, State.APPROVED)
             p = a.payload
-            frec = self.seed.file(p.file_id)
-            data = self.seed.read_file_once(frec)  # read ONCE; these bytes are checked and sent
-            if sha256_bytes(data) != p.attachment_sha256:
+            frec = self.seed.file(p.file_id) if p.file_id else None
+            data = self.seed.read_file_once(frec) if frec else None  # read ONCE; these bytes are checked and sent
+            if (sha256_bytes(data) if data is not None else None) != p.attachment_sha256:
                 return self._to(a, State.FAILED, "changed after approval: attachment")
             raw = build_mime(p, data)
             if sha256_bytes(raw) != p.message_sha256 or seal(p) != a.payload_hash:
@@ -289,7 +354,7 @@ class Guard:
             "recipients": n(s.to + s.cc + s.bcc) == n(p.to + p.cc + p.bcc),
             "subject": s.subject == p.subject,
             "body": _norm_body(s.body) == _norm_body(p.body),
-            "attachment": s.attachments == [(p.file_name, p.attachment_sha256)],
+            "attachment": s.attachments == ([(p.file_name, p.attachment_sha256)] if p.file_id else []),
         }
         a.verification = checks
         self.ledger.emit("verify", action_id=a.id, ok=all(checks.values()), detail=checks)

@@ -69,7 +69,7 @@ class Broker:
             self._cache[item.id] = (r, labs)
         return self._cache[item.id]
 
-    def _released(self, reg: HandleRegistry, item: Item, r: cleaner.CleanResult) -> ReleasedItem:
+    def _released(self, reg: HandleRegistry, item: Item, r: cleaner.CleanResult) -> ReleasedItem | None:
         sender = reg.for_address(item.sender)
         h = reg.for_thread(item.thread_id) if item.kind == "email" else reg.for_event(item.id)
         if r.quarantined:
@@ -90,17 +90,41 @@ class Broker:
             summary = f"{who} asked a question about {_topic(text)}."
         else:
             summary = f"{who} sent an update about {_topic(text)}."
-        if intent == "document_request" and item.kind == "email":
-            reg.note_request(h.handle, item.id, cat, sender.handle)
+        if labels.detect(summary):  # fail closed: a template slot carried a sensitive value (I1, I9)
+            return None
+        if item.kind == "email":
+            reg.note_thread(h.handle, item.id, sender.handle)
+            if intent == "document_request":
+                reg.note_request(h.handle, item.id, cat, sender.handle)
         return ReleasedItem(handle=h.handle, kind=item.kind, sender=sender.handle, intent=intent,
                             requested_category=cat, due=due, summary=summary)
 
-    def release(self, reg: HandleRegistry, purpose: str, query: str = "") -> dict:
+    @staticmethod
+    def _check_purpose(reg: HandleRegistry, purpose: str) -> None:
         if purpose not in PURPOSES:
             raise ValueError(f"unknown purpose: {purpose}")
         allowed = reg.policy.get("purposes", [])
         if purpose not in allowed:
             raise PermissionError(f"purpose '{purpose}' is outside the enabled policy '{reg.policy_name}' (allowed: {', '.join(allowed)})")
+
+    def read(self, reg: HandleRegistry, purpose: str, thread: str) -> dict:
+        """One thread, as a summary. Only threads already released in this session under the policy."""
+        self._check_purpose(reg, purpose)
+        t = reg.threads.get(thread)
+        if t is None:
+            raise PermissionError("not a thread released in this session")
+        item = next(i for i in self.seed.items if i.id == t["item_id"])
+        r, _ = self.analyse(item)
+        ri = self._released(reg, item, r)
+        if ri is None:
+            raise PermissionError("withheld")
+        return {"purpose": purpose, "items": [ri.model_dump()], "withheld": {}, "_released_ids": [item.id],
+                "_quarantined_ids": [], "_withheld_ids": []}
+
+    def release(self, reg: HandleRegistry, purpose: str, query: str = "") -> dict:
+        self._check_purpose(reg, purpose)
+        if purpose == "reply":
+            raise ValueError("purpose 'reply' works on one thread: call read(purpose='reply', thread=THREAD_n)")
         items: list[ReleasedItem] = []
         withheld: Counter = Counter()
         released_ids, quarantined_ids, withheld_ids = [], [], []
@@ -127,8 +151,11 @@ class Broker:
                 keep = item.kind == "event" or (intent == "meeting_request" and not labs)
             elif purpose == "triage":
                 keep = not labs
+            ri = self._released(reg, item, r) if keep else None
+            if keep and ri is None:
+                keep = False
+                withheld["summary_withheld"] += 1
             if keep:
-                ri = self._released(reg, item, r)
                 if purpose == "schedule" and item.kind == "event":
                     ri.summary = f"Busy {item.start[11:16]}–{item.end[11:16]} on {item.start[:10]}."
                     ri.intent = "busy"

@@ -16,6 +16,7 @@ class HandleRegistry:
         self.policy_name = policy_name
         self.policy = policy or {}
         self.requests: dict[str, dict] = {}  # THREAD handle -> {item_id, category, sender}, released in THIS session
+        self.threads: dict[str, dict] = {}   # every THREAD handle released (not quarantined) in THIS session
         self._by_key: dict[tuple[str, str], Handle] = {}
         self._by_handle: dict[str, Handle] = {}
         self._counters: dict[str, int] = {}
@@ -54,6 +55,9 @@ class HandleRegistry:
 
     def for_event(self, event_id: str) -> Handle:
         return self._get("EVENT", event_id, {})
+
+    def note_thread(self, thread_handle: str, item_id: str, sender_handle: str) -> None:
+        self.threads[thread_handle] = {"item_id": item_id, "sender": sender_handle}
 
     def note_request(self, thread_handle: str, item_id: str, category: str | None, sender_handle: str) -> None:
         self.requests[thread_handle] = {"item_id": item_id, "category": category, "sender": sender_handle}

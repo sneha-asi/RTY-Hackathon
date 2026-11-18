@@ -34,6 +34,18 @@ def search(shield: Shield, session_id: str, purpose: str, query: str = "") -> di
     return _record(shield, session_id, "search", _public(out))
 
 
+def read(shield: Shield, session_id: str, purpose: str, thread: str) -> dict:
+    reg = shield.registry(session_id)
+    try:
+        out = shield.broker.read(reg, purpose, thread)
+    except (PermissionError, ValueError) as e:
+        shield.ledger.emit("request_denied", session_id=session_id, tool="read", purpose=purpose, reason=str(e))
+        return {"error": str(e)}
+    shield.ledger.emit("release", session_id=session_id, purpose=purpose, released_ids=out["_released_ids"],
+                       quarantined_ids=[], withheld_ids=[], withheld={})
+    return _record(shield, session_id, "read", _public(out))
+
+
 def list_files(shield: Shield, session_id: str, category: str = "") -> dict:
     out = shield.broker.list_files(shield.registry(session_id), category)
     shield.ledger.emit("release", session_id=session_id, purpose="list_files",
@@ -50,6 +62,11 @@ def free_slots(shield: Shield, session_id: str, start: str, end: str) -> dict:
 def propose_send_document(shield: Shield, session_id: str, request: str, file: str, note: str = "") -> dict:
     a = shield.guard.propose_send_document(session_id, shield.registry(session_id), request, file, note)
     return _record(shield, session_id, "propose_send_document", shield.guard.view_for_model(a))
+
+
+def propose_reply(shield: Shield, session_id: str, thread: str, text: str) -> dict:
+    a = shield.guard.propose_reply(session_id, shield.registry(session_id), thread, text)
+    return _record(shield, session_id, "propose_reply", shield.guard.view_for_model(a))
 
 
 def action_status(shield: Shield, session_id: str, action_id: str) -> dict:
