@@ -23,6 +23,8 @@ An executive's inbox holds sensitive records (term sheets, cap tables, layoff pl
 
 ## Quickstart (local, synthetic data, no accounts)
 
+One command: `bash demo/start.sh`. It installs, creates settings, prints the login password and opens the demo page. Or step by step:
+
 ```bash
 cd backend && pip install -e ".[test]"
 ```

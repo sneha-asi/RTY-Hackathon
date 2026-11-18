@@ -1,5 +1,14 @@
 # Demo: runbook for rehearsal, recording and fallback
 
+## Fastest: one command, no Gmail
+
+```bash
+bash demo/start.sh
+```
+
+This installs Shield on first run, creates the settings, prints the login password, and opens http://127.0.0.1:8000/intake on the synthetic sandbox mailbox. Paste Instinct's reply (or type `Request REQ_7, document FILE_2. Note: Ahead of Friday`), click **Review proposal**, then **Approve & send**, and it ends in **Verified in Sent (sandbox)**. Run it again for a fresh take.
+
+
 This is the single runbook. Synthetic fixtures are in [`fixtures/`](fixtures/): contacts, inbox, calendar, sample files, published IDs and the planted sensitive values the tests check. Scripts are in [`scripts/`](scripts/). Run them from anywhere; tokens, `credentials.json` and `.env` live in `backend/`.
 
 **Primary live flow:** an executive asks Instinct over WhatsApp to prepare an investor follow-up. Instinct reads one labelled synthetic email in the executive's Gmail and replies with a request ID and a document ID. The executive pastes that reply into Shield, which resolves the real recipient and deck locally. The executive approves the exact email once, and Shield shows **Verified in Gmail Sent**.
