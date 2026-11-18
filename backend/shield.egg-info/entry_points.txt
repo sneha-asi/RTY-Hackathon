@@ -1,0 +1,2 @@
+[console_scripts]
+shield = app.__main__:cli

@@ -7,6 +7,14 @@ account that Instinct connects to directly. All data is synthetic. Never run thi
 
   python scripts/gmail_token.py --out token_unprotected.json --scopes insert   (log in as the demo executive inbox)
   python scripts/seed_unprotected_inbox.py --token token_unprotected.json [--dry-run]"""
+# Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
+import os as _os
+import sys as _sys
+from pathlib import Path as _Path
+
+_BACKEND = _Path(__file__).resolve().parents[2] / "backend"
+_sys.path.insert(0, str(_BACKEND))
+_os.chdir(_BACKEND)
 import argparse
 import base64
 import json
@@ -16,14 +24,13 @@ from email.utils import format_datetime
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import load_dotenv  # noqa: E402
 
 load_dotenv()
 from app.seed import fill_placeholders  # noqa: E402
 
-DATA = Path(__file__).resolve().parent.parent / "data"
-FILES = Path(__file__).resolve().parent.parent
+DATA = _Path(__file__).resolve().parents[1] / "fixtures"
+FILES = _Path(__file__).resolve().parents[1] / "fixtures"
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

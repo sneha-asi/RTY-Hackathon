@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: shield
+Version: 0.1.0
+Summary: User-owned trust layer for AI assistants: one standing policy for what an assistant can learn and propose; exact-message approval; verified sends.
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn>=0.30
+Requires-Dist: pydantic>=2.7
+Requires-Dist: mcp<2,>=1.9
+Requires-Dist: beautifulsoup4>=4.12
+Requires-Dist: httpx>=0.27
+Provides-Extra: gmail
+Requires-Dist: google-api-python-client>=2.130; extra == "gmail"
+Requires-Dist: google-auth-oauthlib>=1.2; extra == "gmail"
+Provides-Extra: eval
+Requires-Dist: anthropic>=0.40; extra == "eval"
+Provides-Extra: fixtures
+Requires-Dist: reportlab>=4.0; extra == "fixtures"
+Provides-Extra: test
+Requires-Dist: pytest>=8.0; extra == "test"

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shield"
+version = "0.1.0"
+description = "User-owned trust layer for AI assistants: one standing policy for what an assistant can learn and propose; exact-message approval; verified sends."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.7",
+  "mcp>=1.9,<2",
+  "beautifulsoup4>=4.12",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+gmail = ["google-api-python-client>=2.130", "google-auth-oauthlib>=1.2"]
+eval = ["anthropic>=0.40"]
+fixtures = ["reportlab>=4.0"]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+shield = "app.__main__:cli"
+
+[tool.setuptools]
+packages = ["app", "app.evaluation"]
+
+[tool.setuptools.package-data]
+app = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

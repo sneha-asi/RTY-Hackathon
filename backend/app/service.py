@@ -41,7 +41,7 @@ class Shield:
                            journal=self.journal,
                            sent_label="Gmail Sent" if s.mail_backend == "gmail" else "Sent (sandbox)",
                            review_base=s.review_base)
-        self.policies: dict = json.loads((s.data_dir / "policy.json").read_text())
+        self.policies: dict = json.loads(s.policy_path.read_text())
         self.sessions: dict[str, HandleRegistry] = {}
         self.guard.recover()
         from .watch import FakeWatchSource, GmailWatchSource, Watcher

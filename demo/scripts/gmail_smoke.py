@@ -4,12 +4,19 @@
 
 Uses the same path as the demo: intake "REQ_7 FILE_2" → checks → seal → approve → send from the sender test account
 (GMAIL_TOKEN) to INVESTOR_TEST_GMAIL → verify against Gmail Sent."""
+# Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
+import os as _os
+import sys as _sys
+from pathlib import Path as _Path
+
+_BACKEND = _Path(__file__).resolve().parents[2] / "backend"
+_sys.path.insert(0, str(_BACKEND))
+_os.chdir(_BACKEND)
 import argparse
 import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import load_dotenv  # noqa: E402
 
 load_dotenv()

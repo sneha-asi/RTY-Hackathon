@@ -129,7 +129,7 @@ HARNESS: dict = {"status": "not run"}
 async def harness_run(req: Request, shield_owner: str | None = Cookie(default=None)):
     if not _user(shield_owner):
         raise HTTPException(401, "login required")
-    from . import harness
+    from .evaluation import harness
     body = await req.json()
     runner = body.get("runner", "scripted")
     HARNESS.clear()

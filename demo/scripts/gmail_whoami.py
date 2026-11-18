@@ -1,4 +1,12 @@
 """Which Gmail account does a token belong to?  python scripts/gmail_whoami.py --token token.json"""
+# Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
+import os as _os
+import sys as _sys
+from pathlib import Path as _Path
+
+_BACKEND = _Path(__file__).resolve().parents[2] / "backend"
+_sys.path.insert(0, str(_BACKEND))
+_os.chdir(_BACKEND)
 import argparse
 
 from google.oauth2.credentials import Credentials

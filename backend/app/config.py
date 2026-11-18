@@ -8,6 +8,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+REPO_DIR = BACKEND_DIR.parent
+FIXTURES_DIR = REPO_DIR / "demo" / "fixtures"  # synthetic demo data (contacts, inbox, calendar, files)
 TZ = ZoneInfo("Asia/Kolkata")
 
 
@@ -31,8 +33,9 @@ def _env(name: str, default: str | None = None) -> str | None:
 
 @dataclass
 class Settings:
-    data_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_DATA_DIR", str(BACKEND_DIR / "data"))))
-    files_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_FILES_DIR", str(BACKEND_DIR))))
+    data_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_DATA_DIR", str(FIXTURES_DIR))))
+    files_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_FILES_DIR", str(FIXTURES_DIR))))
+    policy_path: Path = field(default_factory=lambda: Path(_env("SHIELD_POLICY", str(BACKEND_DIR / "config" / "policy.json"))))
     runtime_dir: Path = field(default_factory=lambda: Path(_env("SHIELD_RUNTIME_DIR", str(BACKEND_DIR / "runtime"))))
     mail_backend: str = field(default_factory=lambda: _env("SHIELD_MAIL", "fake"))
     gmail_token: Path = field(default_factory=lambda: Path(_env("GMAIL_TOKEN", str(BACKEND_DIR / "token.json"))))

@@ -12,14 +12,13 @@ from .handles import HandleRegistry
 from .service import Shield
 
 SESSION = "mirror:restricted-inbox"
-DATA = Path(__file__).resolve().parent.parent / "data"
 REQ_RX = re.compile(r"\bREQ_\d+\b")
 FILE_RX = re.compile(r"\bFILE_\d+\b")
 NOTE_RX = re.compile(r"\bnote\s*[:\-]\s*(.+)", re.I | re.S)
 
 
-def _published() -> dict:
-    return json.loads((DATA / "published.json").read_text())
+def _published(shield: Shield) -> dict:
+    return json.loads((shield.settings.data_dir / "published.json").read_text())
 
 
 def registry(shield: Shield) -> HandleRegistry:
@@ -27,7 +26,7 @@ def registry(shield: Shield) -> HandleRegistry:
     reg = shield.registry(SESSION)
     if reg.requests:
         return reg
-    pub = _published()
+    pub = _published(shield)
     for fid_handle, file_id in pub["files"].items():
         f = shield.seed.file(file_id)
         latest = shield.seed.latest(f.category)
@@ -49,7 +48,7 @@ def publication(shield: Shield, only: list[str] | None = None) -> dict:
     """PREVIEW of the safe text for the restricted inbox: one line per eligible request, no addresses, no contents.
     Read-only: nothing is recorded as published until a script actually puts it in a mailbox (record_published)."""
     reg = registry(shield)
-    pub = _published()
+    pub = _published(shield)
     file_for = {v: k for k, v in pub["files"].items()}
     lines, items = [], []
     for req_handle, info in reg.requests.items():

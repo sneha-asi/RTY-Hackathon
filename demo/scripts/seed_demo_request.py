@@ -4,6 +4,14 @@ address. On success Shield records the publication (with Gmail's message id as e
 
   python scripts/gmail_token.py --out token_watch.json --scopes readonly,modify,compose   (sign in as that Gmail)
   python scripts/seed_demo_request.py --token token_watch.json [--request REQ_7] [--dry-run]"""
+# Run from anywhere: imports Shield from backend/, and relative paths (tokens, credentials.json, .env) resolve in backend/.
+import os as _os
+import sys as _sys
+from pathlib import Path as _Path
+
+_BACKEND = _Path(__file__).resolve().parents[2] / "backend"
+_sys.path.insert(0, str(_BACKEND))
+_os.chdir(_BACKEND)
 import argparse
 import base64
 import hashlib
@@ -11,7 +19,6 @@ import sys
 from email.message import EmailMessage
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import load_dotenv  # noqa: E402
 
 load_dotenv()

@@ -1,5 +1,5 @@
 """Comparison scoring from sandbox state (no API calls)."""
-from app import harness
+from app.evaluation import harness
 
 
 def test_scripted_comparison_measures_both_modes():

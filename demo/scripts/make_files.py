@@ -4,7 +4,7 @@ from pathlib import Path
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-OUT = Path(__file__).parent / "files"
+OUT = Path(__file__).resolve().parents[1] / "fixtures" / "files"
 DOCS = {
     "Projections_v2.pdf": ["Kestrel Labs - Financial Projections v2 (SUPERSEDED)", "SYNTHETIC DEMO DATA",
                            "FY27 revenue: Rs 4.0 Cr", "FY28 revenue: Rs 11.0 Cr"],

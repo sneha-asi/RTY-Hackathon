@@ -8,8 +8,8 @@ from email.message import EmailMessage
 
 from bs4 import BeautifulSoup
 
+from ..service import Shield
 from .pdftext import pdf_text
-from .service import Shield
 
 
 def _raw_text(html: str) -> str:
