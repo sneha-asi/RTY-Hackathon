@@ -4,14 +4,15 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shield intake</title>
 <style>
-:root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--text:#e8ebf1;--mute:#9aa3b2;--ok:#3ecf8e;--warn:#f5b74a;--bad:#ff5d5d;--info:#6aa8ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+:root{--bg:#f6f5f2;--panel:#ffffff;--line:#e4e1da;--text:#1c1b19;--mute:#6f6b63;--ok:#1f7a4d;--warn:#9a6400;--bad:#b42318;--info:#1d4ed8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Inter,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wordmark{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:22px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
 main{max-width:720px;margin:0 auto;padding:24px 16px}.brand{color:var(--mute);font-size:14px;margin-bottom:14px}.brand b{color:var(--text)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(28,27,25,.04);padding:18px;margin-bottom:14px}
 .label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
 textarea,input{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px}
 textarea{min-height:120px;font-family:inherit}
-button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:16px;cursor:pointer;background:var(--info);color:#071225;margin-top:10px}
+button{border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:16px;cursor:pointer;background:var(--text);color:#fff;margin-top:10px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute);white-space:pre-wrap}
 .bad{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}
 .conn{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--mute);margin-bottom:14px}
@@ -21,7 +22,7 @@ button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:1
 </head>
 <body>
 <main>
-  <div class="brand">🛡 <b>Shield</b> · investor follow-ups</div>
+  <div class="brand"><span class="wordmark">Shield</span> · investor follow-ups</div>
   <div class="conn" id="conn">Instinct has direct Gmail access · Shield controls sends approved here</div>
   <div id="login" class="card" hidden><p class="label">Owner login</p><input id="secret" type="password" placeholder="Shield secret" onkeydown="if(event.key==='Enter')login()"><button onclick="login()">Log in</button></div>
   <div id="view" hidden>

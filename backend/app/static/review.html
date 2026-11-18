@@ -4,27 +4,28 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shield review</title>
 <style>
-:root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--text:#e8ebf1;--mute:#9aa3b2;--ok:#3ecf8e;--warn:#f5b74a;--bad:#ff5d5d;--info:#6aa8ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+:root{--bg:#f6f5f2;--panel:#ffffff;--line:#e4e1da;--text:#1c1b19;--mute:#6f6b63;--ok:#1f7a4d;--warn:#9a6400;--bad:#b42318;--info:#1d4ed8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Inter,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wordmark{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:22px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
 main{max-width:760px;margin:0 auto;padding:20px 16px}
 .brand{color:var(--mute);font-size:14px;margin-bottom:8px}.brand b{color:var(--text)}
 .conn{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--mute);margin-bottom:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(28,27,25,.04);padding:16px;margin-bottom:12px}
 .label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
 .state{font-size:22px;font-weight:700}.VERIFIED{color:var(--ok)}.BLOCKED,.FAILED,.REJECTED{color:var(--bad)}.UNVERIFIED,.VERIFICATION_PENDING{color:var(--warn)}.AWAITING_APPROVAL,.EXECUTING,.APPROVED{color:var(--info)}
 .steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:14px}
 .steps span{border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--mute)}
 .steps span.done{border-color:var(--ok);color:var(--ok)}.steps span.now{border-color:var(--info);color:var(--info);font-weight:700}.steps span.warn{border-color:var(--warn);color:var(--warn)}
-.notsent{background:#14233b;border:1px solid var(--info);border-radius:8px;padding:8px 12px;margin-top:10px;font-weight:600}
+.notsent{background:#eef2ff;border:1px solid #c7d2fe;color:#1e3a8a;border-radius:8px;padding:8px 12px;margin-top:10px;font-weight:600}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:640px){.cols{grid-template-columns:1fr}}
 .to{font-size:19px;font-weight:600;word-break:break-all}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--mute);word-break:break-all}
 .body{white-space:pre-wrap;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:15px}
-.warn{background:#3a2c10;border:1px solid var(--warn);color:#ffe2a8;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:15px}
+.warn{background:#fff7e6;border:1px solid #f3d9a4;color:#7a4b00;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:15px}
 .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:15px}.kv b{color:var(--mute);font-weight:500}
 .id{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--info)}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
-button{border:0;border-radius:10px;padding:12px 20px;font-weight:700;font-size:16px;cursor:pointer}
-.approve{background:var(--ok);color:#06210f}.reject{background:#2b313d;color:var(--text)}
+button{border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:16px;cursor:pointer}
+.approve{background:var(--text);color:#fff}.reject{background:transparent;color:var(--text);border:1px solid var(--line)}
 input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;width:100%}
 .match{font-size:15px}.match .y{color:var(--ok)}.match .n{color:var(--bad)}
 .receipt{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;font-size:14px}.receipt b{color:var(--mute);font-weight:500}
@@ -34,7 +35,7 @@ details summary{cursor:pointer;color:var(--mute)}.check{display:grid;grid-templa
 </head>
 <body>
 <main>
-  <div class="brand">🛡 <b>Shield</b> · investor follow-ups · <span id="client"></span></div>
+  <div class="brand"><span class="wordmark">Shield</span> · investor follow-ups · <span id="client"></span></div>
   <div class="conn" id="conn"></div>
   <div id="login" class="card" hidden>
     <p class="label">Owner login</p>
