@@ -85,6 +85,27 @@ Not every assistant lets a third party sit in its path. Shield uses the stronges
 
 The honest claim: **full guarantees in mode 1; strong containment in modes 2–3; visibility and kill-switch in mode 4.** We never claim to prevent what we can't sit in front of.
 
+### 4.1 What "platform-agnostic" means
+
+- **One policy, every supported client.** The user writes their rules once (who may receive what, which actions need approval, what is never shared). The same policy, checks and ledger apply to every assistant client that reaches the account through Shield. Switching from Claude to ChatGPT to Cursor changes nothing about what is protected.
+- **Full enforcement requires Shield to be the sole path to the protected account.** If an assistant also holds its own OAuth grant to the same Gmail, it can go around Shield. Shield therefore:
+  - lists the account's OAuth grants on connect and asks the user to revoke direct grants to assistants;
+  - re-checks the grants periodically (mode 4) and shows **"sole path: yes / no"** per account on the dashboard;
+  - downgrades its own claim for that account from Enforce to Watch while a bypass grant exists.
+- It does **not** mean every control works with every assistant. The matrix below says which controls each integration supports.
+
+| Control | Mode 1: MCP connector (Claude, ChatGPT dev mode, Cursor, custom agents) | Mode 2: Edge (local proxy / browser extension) | Mode 3: Mirror (closed assistants) | Mode 4: Watch (any account) |
+|---|---|---|---|---|
+| Need-to-know release (handles, summaries) | ✔ | ✘ | ✔ (mirror holds only released items) | ✘ |
+| Hidden-text cleaning + quarantine | ✔ | Partial (web pages, downloads) | ✔ (applied before mirroring) | ✘ (alert only) |
+| Propose-only actions, code-resolved targets | ✔ | ✘ | ✔ for actions sent from the mirror | ✘ |
+| Outbound leak blocking (URLs, images) | ✔ | ✔ (blocks egress to unapproved hosts) | ✔ for mirror sends | ✘ |
+| Sealed human approval | ✔ | Partial (approve blocked requests) | ✔ for mirror sends | ✘ |
+| Outcome verification | ✔ | ✘ | ✔ | ✔ (after the fact) |
+| Receipts / audit | ✔ | ✔ (egress log) | ✔ | ✔ |
+| Revoke access | ✔ (disconnect) | ✔ | ✔ | ✔ (OAuth revoke) |
+| Requires sole path for its guarantees | Yes | Yes (all egress via proxy) | Yes (assistant sees only the mirror) | No |
+
 ## 5. Sources and actions in the full product
 
 | Area | Read through Shield | Actions through Shield |
@@ -102,14 +123,14 @@ The honest claim: **full guarantees in mode 1; strong containment in modes 2–3
 
 ## 6. Guarantees
 
-**By construction** (traffic through Shield, mode 1):
-1. The model never receives raw identifiers, file contents, or detected sensitive spans.
+**By construction** (traffic through Shield, mode 1, where Shield is the sole path):
+1. **Privacy is guaranteed at the tool interface.** Every Shielded tool result is built by Shield from **handles, structured attributes and server-written summaries**. Raw source text (email bodies, document contents, invite descriptions) is never passed through to the model in M0. Detection, masking and quarantine are additional safeguards on the fields Shield writes, not the guarantee itself. This makes "zero sensitive values" testable: every sensitive value in the demo fixtures is enumerated, and a test asserts none appears in any tool result.
 2. The model cannot cause an action on a target code didn't resolve from the user's own records.
 3. Model-written text cannot carry external URLs or images out.
 4. An approved payload can't change before execution without failing.
 5. Nothing is reported done without verification against the real system's record.
 
-**Not guaranteed** (said out loud): catching every hidden instruction (detection is defence in depth); masking every sensitive item in free text (mitigated by purpose rules + fail closed); prevention for assistants we can't sit in front of (modes 3–4 contain and detect instead); a user approving a bad action (mitigated by showing the real, code-generated payload).
+**Not guaranteed** (said out loud): catching every hidden instruction (detection is defence in depth); privacy for free text if a later version passes source text through (M0 doesn't; mitigated by purpose rules + fail closed); prevention for assistants we can't sit in front of (modes 3–4 contain and detect instead); a user approving a bad action (mitigated by showing the real, code-generated payload).
 
 ## 7. Users
 
@@ -169,13 +190,14 @@ Other sources (messaging, browser, money, devices); modes 2–4; multi-user poli
 
 | Goal | Measured as |
 |---|---|
-| Minimise what the model sees | Shielded demo task: ≤4 items released, **0 sensitive values** |
+| Minimise what the model sees | "Handle my investor follow-ups": **0 sensitive fixture values** in any tool result; unrelated sensitive items reported only as withheld counts |
 | Injections are powerless | **0 of 5** attacks (A1–A5) succeed through Shield, scored from sandbox state |
-| Still useful | Benign task succeeds through Shield **3/3** runs |
-| Code decides who/what | Every send resolved from contacts + file catalogue; a raw address → BLOCKED |
-| Proof before "done" | 0 unverified successes; tampered file/payload → FAILED |
+| Still useful | The investor follow-up task succeeds through Shield **3/3** runs |
+| Code decides who/what | Every send resolved from contacts + file catalogue; unknown or raw recipient → BLOCKED |
+| Only the user approves | Approval requires the authenticated user and the matching seal; no MCP tool can approve |
+| Proof before "done" | Only VERIFIED counts as success; tampered file/payload → FAILED; ambiguous provider result → VERIFICATION_PENDING, never resent |
 | Auditable | Receipt query answers "did any AI see X?" with counts |
-| Reliable demo | Full demo 5× in a row; one real Gmail send verified on stage |
+| Reliable demo | Full demo 5× in a row; **one live Gmail send verified on stage**; the same flow rehearsed in the sandbox as the fallback |
 
 ### 10.3 Architecture
 
@@ -216,8 +238,8 @@ Stack: Python 3.12 · FastAPI · official `mcp` SDK · Anthropic SDK (harness on
 
 | Tool | Input | Returns |
 |---|---|---|
-| `search` | `purpose`, `query?` | Masked items as handles + withheld counts |
-| `read` | `purpose`, thread handle | Masked thread, only if purpose allows |
+| `search` | `purpose`, `query?` | Items as handles + structured attributes + server-written summary; withheld counts |
+| `read` | `purpose`, thread handle | Server-written summary of the thread + structured fields (intent, requested category, due date), only if purpose allows |
 | `list_files` | `category?` | `FILE_n` handles: category, version, requires_nda. Never contents |
 | `free_slots` | date range | Free/busy only |
 | `propose_send_document` | recipient handle, file handle, `note?` | `{action_id, status, checks[], readback}` |
@@ -237,26 +259,53 @@ There is deliberately **no `send_email(to, …)`**. The Direct baseline (compari
 | CONTENT | No external URLs, markdown images, raw emails, handles or sensitive patterns; length cap | Any found |
 | LOCK | Seal at proposal; recompute at execution | Hash mismatch → FAILED |
 
-**Seal:** `payload_hash = sha256(type ‖ recipient_contact_id ‖ recipient_email ‖ subject ‖ body ‖ file_id ‖ file_sha256 ‖ slot)`, recomputed at execution from the stored payload and the file bytes on disk now.
+**Who can approve.** Only the authenticated user. The dashboard's approve/reject endpoints require the user's session (login with a user secret set at install; the MCP client never holds it). There is no approve tool on the MCP surface, so no model, prompt or tool call can approve. An approval request must carry the seal shown on screen; if it doesn't match the action's current seal, the approval is refused.
+
+**What gets sealed.** At proposal, code builds the **exact outgoing message**: the complete MIME bytes (headers, body, attachment, with a fixed Message-ID and boundary), the **full recipient list** (To, Cc, Bcc) and the **attachment SHA-256**.
+`seal = sha256(canonical{type, recipients_to, recipients_cc, recipients_bcc, message_sha256, attachment_sha256, slot})`.
+The approval screen shows the recipients, subject, body, file name and the seal prefix taken from these same sealed values.
+
+**Same bytes that passed the check are sent.** At execution, Shield reads the file once into memory, checks its hash against the sealed attachment hash, rebuilds the message from the sealed fields plus those in-memory bytes, checks the message hash against the sealed message hash, and sends **those exact bytes**. Nothing is re-read between the check and the send. Any mismatch → FAILED "changed after approval".
 
 **State machine:**
 ```
-PROPOSED ──► BLOCKED                         (terminal, reason)
-    └──► AWAITING_APPROVAL ──► REJECTED      (terminal)
-              └──► APPROVED ──► EXECUTING ──► VERIFIED  (terminal ✅)
-                                     └──────► FAILED    (terminal ❌, never shown as success)
+PROPOSED ──► BLOCKED                          (terminal, reason)
+    └──► AWAITING_APPROVAL ──► REJECTED       (terminal)
+              └──► APPROVED ──► EXECUTING ──► VERIFIED                (terminal ✅, the only success)
+                                    │    └──► FAILED                  (terminal ❌, definitely not sent)
+                                    └──► VERIFICATION_PENDING ──► VERIFIED
+                                                             └──► UNVERIFIED (terminal ⚠, may have been sent)
 ```
+- **VERIFICATION_PENDING**: the provider timed out or errored *after* the send may have gone out, or the read-back isn't visible yet. The dashboard and the assistant show "may have been sent, verifying". Shield retries verification by looking up the sealed Message-ID in the Sent folder, with backoff, for up to 2 minutes.
+- **Never resend.** Once the send call has been made, the action can never send again, whatever the outcome; retries only re-read.
+- **UNVERIFIED** after the retry window: shown as "may have been sent, could not confirm; check your Sent folder". Not a success, not a silent failure.
+- **Only VERIFIED counts as success** in the dashboard, receipts, harness and status text.
+
 Every transition appends `{ts, session_id, action_id, from, to, reason}` to the ledger and SSE. Illegal transitions raise. Any error in resolve/check → BLOCKED (fail closed).
 
-### 10.4 Demo journeys
+### 10.4 Demo journey: "Handle my investor follow-ups"
 
-1. **Safe send (primary).** "Send Priya the projections she asked for." → `search(purpose=share_document)` releases the request thread + file catalogue as handles → `propose_send_document(CONTACT_1, FILE_2)` → WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY NDA ✔ · CONTENT ✔ · LOCK sealed → approve on the dashboard (real resolved payload shown) → Gmail send → read-back → ✅ VERIFIED.
-2. **Injection neutralised.** Triage: invite + email carry hidden instructions → stripped/quarantined; model sees `[quarantined · SENDER_4]`; red banner on dashboard.
-3. **Unknown recipient.** "New investor" asks for the data room → propose to `SENDER_3` → WHO ✘ → 🛑 BLOCKED.
-4. **Leak channel.** Draft reply contains a markdown image URL → CONTENT ✘ → 🛑 BLOCKED.
-5. **Tamper.** Swap the projections file after approval → LOCK mismatch → ❌ FAILED "changed after approval".
-6. **Receipt.** "Did any AI see my cap table today?" → "No. Requested 2×, withheld 2×."
-7. **NDA downgrade.** Karan (investor, no NDA) asks for projections → WHAT downgrades to Teaser Deck with a warning.
+**The user problem:** a founder's inbox mixes investor requests with cap tables, layoff plans, tax IDs and medical notes, plus mail from strangers. They want the assistant to clear investor follow-ups without seeing the rest, without sending anything to the wrong person, and with proof of what went out.
+
+**One workflow**, one request from the user: *"Handle my investor follow-ups."*
+
+| Step | What happens | What the audience sees |
+|---|---|---|
+| 1. Look | Assistant calls `search(purpose=share_document, query="investor")` | Model gets 3 items as handles + server-written summaries: Priya (investor, NDA ✔) asked for projections by Friday; Karan (investor, no NDA) asked for projections; `SENDER_3` (unknown) asked for the data room. **Unrelated sensitive data withheld**: term sheet, cap table, layoff plan, GST/PAN, medical note appear only as "withheld: financial 2 · hr 1 · identity 1 · health 1". The hidden-instruction email shows as `[quarantined · SENDER_4]` |
+| 2. Propose | `propose_send_document(CONTACT_1, FILE_2)` for Priya; `propose_send_document(SENDER_3, FILE_2)` for the stranger | Priya: WHO Priya Rao ✔ · WHAT Projections v3 ✔ · POLICY NDA ✔ · CONTENT ✔ · LOCK sealed → AWAITING_APPROVAL. Stranger: **🛑 BLOCKED, unknown recipient** ("add them as a contact first") |
+| 3. Approve | Founder approves Priya's card on the dashboard (logged in) | Card shows the real address, subject, body, `Projections_v3.pdf` and the seal prefix |
+| 4. Send + verify | Live Gmail send of the sealed bytes, read-back from Sent | **✅ VERIFIED**: recipients match, attachment SHA-256 matches |
+| 5. Relay | Assistant calls `action_status` and repeats the code-written text | "Sent and verified: Priya Rao received Projections v3." |
+
+Karan's request (no NDA) is handled in the same run: WHAT downgrades to the Teaser Deck with a warning. Shown if time allows.
+
+**Supporting scenarios** (in the test suite and the harness; shown on stage only if time allows):
+- **Leak channel:** a reply containing a markdown image URL → CONTENT ✘ → 🛑 BLOCKED.
+- **Tamper:** swap the projections file after approval → ❌ FAILED "changed after approval".
+- **Provider timeout:** Gmail times out after the send → VERIFICATION_PENDING → VERIFIED on retry, sent once.
+- **Receipt:** "Did any AI see my cap table today?" → "No. Withheld 2×."
+
+**Fallback:** the identical workflow runs in the sandbox (FakeMail) and is rehearsed 5×. If the live Gmail send fails on stage, switch to the sandbox run and the backup video.
 
 ### 10.5 Attack suite
 
@@ -289,9 +338,9 @@ All P0 unless marked.
 | F11 | POLICY | One test per rule |
 | F12 | CONTENT | Image-URL exfil → BLOCKED |
 | F13 | LOCK | Tampered payload or file → FAILED |
-| F14 | Approval API + dashboard showing the real payload | Only AWAITING_APPROVAL approvable; idempotent |
-| F15 | Executor: sandbox + Gmail with attachment | Real email lands in investor test inbox |
-| F16 | Verifier | Match → VERIFIED; any mismatch → FAILED |
+| F14 | Approval API + dashboard showing the real sealed payload; authenticated user only; approval carries the seal | Unauthenticated or wrong-seal approval refused; only AWAITING_APPROVAL approvable; idempotent |
+| F15 | Executor: sandbox + Gmail; sends the exact sealed MIME bytes | Real email lands in investor test inbox; sent bytes hash == sealed message hash |
+| F16 | Verifier with VERIFICATION_PENDING and retry | Match → VERIFIED; mismatch → FAILED; provider timeout → VERIFICATION_PENDING → retried, never resent |
 | F17 | Ledger + SSE + receipt queries | Cap-table question answered correctly |
 | F18 | MCP server (streamable HTTP) | Claude connects and completes the demo task |
 | F19 | Harness: Direct vs Shielded, 3 runs each | Dashboard shows measured utility / attack success / exposure |
@@ -321,24 +370,32 @@ All P0 unless marked.
 
 ### 10.9 Definition of done
 
-- [ ] Claude, over MCP, completes "send Priya the projections" end to end
-- [ ] Shielded exposure for the demo task = 0 sensitive values, on the dashboard
+- [ ] Claude, over MCP, completes "Handle my investor follow-ups" end to end
+- [ ] 0 sensitive fixture values in any Shielded tool result (enumerated-fixture test), shown on the dashboard
+- [ ] Unknown-recipient data-room request → BLOCKED in the same run
 - [ ] A1–A5 all fail through Shield (sandbox-state scored, 3 runs)
-- [ ] Real Gmail email with Projections v3 lands and shows VERIFIED (SHA-256 matched)
+- [ ] **One live Gmail send** of Projections v3 to the investor test inbox shows VERIFIED (recipients + SHA-256 matched)
+- [ ] The same workflow passes in the sandbox (fallback), rehearsed
+- [ ] Only the authenticated user can approve; wrong-seal approval refused
 - [ ] Tampered file/payload after approval → FAILED
+- [ ] Simulated provider timeout → VERIFICATION_PENDING → VERIFIED, exactly one message sent
 - [ ] Receipt query answers the cap-table question correctly
 - [ ] pytest all green
 - [ ] Demo run 5× consecutively; backup video recorded
 
 ### 10.10 3-minute demo script
 
-1. **Hook (20s):** Assistants like Instinct want access to everything. Instinct emailed an investor without asking. Copilot, Gemini and ChatGPT were hijacked by an email or an invite. 32% of AI users have already let AI act without sign-off.
-2. **Direct (40s):** "Check my week, then send Priya the projections she asked for." Left panel: what the model received (term sheet, layoff email, GST/PAN, medical note, poisoned invite) with the measured exposure count.
-3. **Shielded (60s):** invite quarantined → model sees ~3 items, 0 sensitive, as handles → proposes `FILE_2 → CONTACT_1` → checks go green → approve → real email lands → ✅ VERIFIED.
-4. **Attacks (30s):** data-room request from unknown sender → 🛑; image-URL leak → 🛑.
-5. **Tamper (15s):** swap file after approval → ❌ FAILED "changed after approval".
-6. **Receipt (15s):** "Did any AI see my cap table today?" → "No. Withheld 2×."
-7. **Close (15s):** one slide of §4: enforce where we sit in the path, contain closed assistants with mirrors, watch and verify everything else. "Muse protects Muse. Shield protects you, with any assistant, across everything it touches."
+1. **The user problem (25s):** "I'm a founder. My inbox has investor requests next to my cap table, a layoff plan, my PAN and a medical note. I want an assistant to handle investor follow-ups, but assistants want access to everything, and they've been hijacked by a single email. Instinct emailed an investor without asking."
+2. **Without Shield (30s):** same request, same model, raw tools. Left panel: everything the model received (term sheet, cap table, layoff plan, GST/PAN, medical note, the poisoned email) with the measured exposure count.
+3. **With Shield (75s):** *"Handle my investor follow-ups."*
+   - Model sees three investor requests as handles and summaries; everything unrelated shows only as **withheld** counts; the poisoned email is quarantined.
+   - Stranger asking for the data room → **🛑 BLOCKED, unknown recipient.**
+   - Priya → checks go green → founder approves → live Gmail send → **✅ VERIFIED** (recipient and attachment fingerprint match).
+   - Assistant relays the code-written status.
+4. **Receipt (15s):** "Did any AI see my cap table today?" → "No. Withheld 2×."
+5. **Close (25s):** one slide of §4.1: the same policy works across assistants; full enforcement where Shield is the sole path; mirrors contain closed assistants; watch and verify everything else. "Muse protects Muse. Shield protects you, with any assistant, across everything it touches. The AI proposes. The code decides. Nothing is done until it's proven."
+
+Fallback: if the live send fails, run the same workflow in the sandbox, then the backup video.
 
 ---
 
