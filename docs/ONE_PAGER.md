@@ -1,69 +1,74 @@
 # Shield — one page
 
-*Claude's read of the PRD, so we can confirm we're aligned before coding.*
+*Team Axon · Track `ai-agents`. The shared understanding we're building from. Full detail: [PRD](PRD.md), [LLD](LLD.md).*
 
 ## The idea in one sentence
 
-A layer the user owns that sits around **everything** an AI assistant can reach (email, calendar, files, messages, browser, money, devices), so the model **sees only labels, never the real data, and can only ask; code decides what actually happens, a human approves the risky parts, and Shield checks the real world to prove it happened.**
+A layer the user owns that sits between AI assistants and **everything they can reach** (email, calendar, files, messages, browser, money, devices). The model gets only what the task needs and can only *propose* actions. Code decides who and what, the user approves the exact action, and Shield checks the provider's record before calling anything done.
 
 ## The problem
 
-Assistants like Instinct, Muse and OpenClaw ask for access to almost everything. Anything they read (an email, an invite, a doc, a web page) can carry hidden instructions. An assistant with **private data + untrusted content + a way to act outward** will eventually be turned against its user (the "lethal trifecta"). Copilot, Gemini and ChatGPT have all been hijacked this way; OpenClaw deleted an inbox; Instinct emailed an investor unasked. Making the model resist doesn't work: 99% detection still loses. The more an assistant can reach, the worse it gets.
+Assistants like Instinct, Muse and OpenClaw ask for access to almost everything. Content they read (an email, an invite, a doc) can carry hidden instructions. An assistant that combines **private data + untrusted content + a way to act outward** can be steered against its user: the "lethal trifecta". Copilot, Gemini and ChatGPT have each been hijacked through content they read; Instinct emailed an investor unasked. Detection alone can't close this, so Shield doesn't rely on it.
 
-## The insight
+## What reaches the model (M0)
 
-Don't make the model smarter. **Take the dangerous things out of its hands, for every account:**
+Shield returns only **handles, structured attributes and purpose-filtered summaries** that Shield writes itself. No raw email or document text is passed through.
 
 | The model never gets… | Instead it gets… |
 |---|---|
-| Real addresses, file contents, account numbers, PAN/keys | Handles: `CONTACT_1 · investor · NDA ✔`, `FILE_2 · projections · v3` |
-| Hidden or instruction-like text | `[quarantined · SENDER_4]` |
-| Raw send / pay / delete / share tools | `propose_*` tools. Code runs WHO · WHAT · POLICY · CONTENT · LOCK |
-| Freedom to put links/images in outgoing text | Blocked (closes the EchoLeak leak channel) |
-| A say in whether it worked | Code checks the real record (sent folder, statement, calendar) |
+| Addresses, file contents, account numbers, PAN, keys | Handles: `CONTACT_1 · investor · NDA ✔`, `FILE_2 · projections · v3` |
+| Email bodies | A summary such as "Priya Rao (investor, NDA on file) asked for projections, due Fri." |
+| Items outside the task's purpose | Withheld counts only: "withheld: financial 2 · hr 1 · health 1" |
+| Raw send / share tools | `propose_*` tools; code runs WHO · WHAT · POLICY · CONTENT · LOCK |
 
-## Shielding assistants we can't sit in front of
+The cleaner strips hidden text and **quarantines the seeded malicious examples** in our test set. It is an extra safeguard, not the guarantee: the guarantee comes from what the tool interface returns.
 
-| Mode | For | How |
-|---|---|---|
-| **Enforce** | Assistants that take connectors (Claude, ChatGPT, Cursor, MCP agents) | Assistant talks to Shield instead of the account. Full guarantees |
-| **Enforce at the edge** | Agents on your laptop or in your browser | Local proxy / extension blocks unapproved destinations and leaks |
-| **Contain** | Closed assistants with their own logins (Instinct, Muse) | Give them a Shield-managed mirror: filtered inbox, free/busy calendar, safe-files folder, capped virtual card |
-| **Watch & verify** | Every account, always | Compare the account's own records with what you approved; alert and one-click revoke |
+## Approval and verification
 
-Restrict wherever we can; where we can't prevent, we shrink what's reachable; where we can't shrink, we watch and give a kill switch. We never claim more than that.
+- The **user** (logged in to Shield, never the assistant) approves the **exact recipients (To/Cc/Bcc), message and attachment**.
+- Shield sends **the same attachment bytes it checked**; anything changed after approval → FAILED.
+- If delivery is uncertain (timeout after send), the action shows **VERIFICATION_PENDING** and Shield checks the provider's Sent record. **An uncertain send never triggers an automatic resend.**
+- Only **VERIFIED** counts as success.
 
-## What we build today (hackathon slice)
+## Where the guarantees hold
 
-**Enforce mode, for email + files + calendar**, on a synthetic sandbox plus one real Gmail send. It's the slice that shows every guarantee end to end with a real agent using the tool.
+| Access path | What we claim |
+|---|---|
+| Shield is the assistant's **only route** to the account (MCP connector) | Full enforcement: the guarantees above |
+| Closed assistant, **supported mirror** available | Containment: it sees only what Shield mirrors; only mirror sends are gated |
+| Any account | Monitoring and revocation, **as far as each provider exposes** grants, sent records and revoke APIs |
+
+The same policy applies across every supported assistant. We never claim more than the path allows.
+
+## The demo: "Handle my investor follow-ups"
+
+The concrete case is **"send Priya the projections"**:
 
 ```
-"Send Priya the projections"
-  → search(purpose=share_document)    model sees 3 handles, 0 sensitive values
-  → propose_send_document(CONTACT_1, FILE_2)
+search(purpose=share_document)        → investor requests as handles + summaries; the rest withheld
+propose_send_document(CONTACT_1, FILE_2)
   → WHO ✔ Priya Rao · WHAT ✔ Projections v3 · POLICY ✔ NDA · CONTENT ✔ · LOCK 🔒
-  → approve on dashboard → Gmail sends → Shield re-reads it → ✅ VERIFIED
+propose_send_document(SENDER_3, FILE_2)   (stranger asking for the data room) → 🛑 BLOCKED
+user approves exact payload → live Gmail send → Shield reads the Sent record → ✅ VERIFIED
 ```
 
-| Demo scene | Result | Proves |
-|---|---|---|
-| Direct vs Shielded, same task, same model | Exposure: many → 0 | Need-to-know works; task still done |
-| Poisoned invite / white-on-white email | Quarantined | Cleaner |
-| Unknown "investor" wants the data room | 🛑 BLOCKED (WHO) | Code picks recipients |
-| Reply with a hidden image URL | 🛑 BLOCKED (CONTENT) | Leak channel closed |
-| File swapped after approval | ❌ FAILED (LOCK) | Approval means exact bytes |
-| "Did any AI see my cap table today?" | "No, withheld 2×" | Audit trail |
+- **Comparison:** same request, same model, Direct vs Shielded. We show **sensitive values exposed** and **task completed** for both, exactly as measured.
+- **Target until tested:** about 3 handles released, 0 sensitive values.
+- **Receipt:** "Shield released the cap table 0 times and withheld it twice today."
+- **Fallback:** the same flow in the sandbox, rehearsed.
 
-The other modes and sources are one roadmap slide at the close.
+## Build order
 
-## Why it scores on the three judging criteria
+1. **Vertical slice:** MCP → proposal → minimal approval screen → sandbox send → verified read-back, with tests alongside.
+2. VERIFICATION_PENDING + no-resend; tamper → FAILED.
+3. Full seed, cleaner and fixture-based privacy test.
+4. Gmail adapter (one live send).
+5. Dashboard and receipts.
+6. Comparison scenes.
+7. Calendar first cut: free/busy only.
 
-- **Working product:** Claude, connected over MCP, does a real task; a real email lands with ✅ VERIFIED.
-- **Problem insight:** the trifecta explains *why* every assistant gets hijacked, and why "access to everything" makes it worse.
-- **Depth:** handles + deterministic checks + payload seal + read-back verification + a measured Direct-vs-Shielded comparison on 5 recreated attacks.
+## Why it scores
 
-## Open points before coding
-
-1. **Name.** Docs now say **Shield**, standalone. `team.json` still says "Axon Voice" with a phone-call one-liner, and the team is registered as "Axon". The team name can stay; the project title and one-liner should change to Shield.
-2. **Time.** Code freeze is 7:00 PM. Build order: handles + broker → cleaner → guard (5 checks + seal) → sandbox executor + verifier → MCP server with Claude doing the Priya task → tests → minimal dashboard → one real Gmail send. Cut first if needed: 3-run harness, ngrok, calendar tools.
-3. **Branch.** Judges read the default branch; this work is on `claude/focused-rubin-b43hc6` and must be merged before 7.
+- **Working product:** Claude over MCP completes a real task; a real email lands, ✅ VERIFIED.
+- **Problem insight:** the trifecta explains why access to everything is dangerous, and why detection isn't enough.
+- **Depth:** a tool interface that never returns raw text, sealed exact-payload approval, no-resend verification, and measured comparisons.

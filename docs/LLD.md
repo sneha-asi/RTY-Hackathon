@@ -625,7 +625,9 @@ Writes go to memory plus `runtime/ledger.jsonl` (git-ignored) for the backup vid
 | `what_blocked(today)` | "blocked", "stopped" | BLOCKED transitions + quarantine events |
 
 Example: "Did any AI see my cap table today?" → X = `cap_table` →
-`"No. Requested 2×, withheld 2× (purpose: triage, schedule). Evidence: events #14, #31."`
+`"Shield released the cap table 0 times and withheld it twice today (purposes: triage, share_document). Evidence: events #14, #31."`
+
+Receipts state what Shield did, from ledger counts. They do not claim what an assistant did outside Shield.
 
 ## 9. Tool surface (`tools.py`, wrapped by `mcp_server.py`)
 
@@ -770,7 +772,7 @@ class ActionSpec(Protocol):             # send_document, reply, event today; pay
 | `test_detectors.py` | Each detector: ≥2 positive, ≥2 negative (bad Verhoeff, bad Luhn, wrong PAN 4th char, UPI vs email) |
 | `test_cleaner.py` | Each hidden rule; zero-width; padding; instruction patterns; trusted vs untrusted; newsletter preheader not quarantined; A1, A2, A3 quarantined |
 | `test_handles.py` | Stable within a session, different across sessions; unknown → SENDER; no `@` or path in any attr |
-| `test_broker.py` | Per purpose: released/withheld ids; demo task ≤4 released, 0 sensitive; `shareable=false` files never listed |
+| `test_broker.py` | Per purpose: released/withheld ids; demo task measured (target ≤4 released, 0 sensitive fixture values); `shareable=false` files never listed |
 | `test_guard_checks.py` | WHO (A4, raw address A5, unknown handle); WHAT (Priya → v3, Karan → teaser, v2 → v3 warn); POLICY (secrets, hr never); CONTENT (URL, image, handle, PAN, length) |
 | `test_state_machine.py` | Every legal transition; every illegal one raises; double approve sends once; reject after approve is a no-op |
 | `test_approval_auth.py` | No cookie → 401; wrong seal → 409 and state unchanged; no approve tool in the MCP registry |
@@ -789,16 +791,17 @@ class ActionSpec(Protocol):             # send_document, reply, event today; pay
 
 ## 16. Build order
 
+**Vertical slice first, tests alongside.** Nothing else starts until slice 1 runs end to end.
+
 | # | Slice | Done when |
 |---|---|---|
-| 1 | models, seed extension (emails, events, new files), runtime copy | Seed loads, shas computed |
-| 2 | labels + cleaner + tests | A1–A3 quarantined; detector tests green |
-| 3 | handles + broker + exposure + tests | Demo task: 0 sensitive released |
-| 4 | guard (checks, MIME seal, state machine incl. VERIFICATION_PENDING) + FakeMail + verifier + approval auth + tests | Investor follow-up workflow passes on FakeMail; tamper FAILED; timeout → pending → VERIFIED, sent once |
-| 5 | ledger + receipts + REST + SSE | Cap-table receipt correct |
-| 6 | MCP server; Claude completes the Priya task | Live run end to end |
-| 7 | Dashboard | Readable action card + exposure panels |
-| 8 | GmailMail (required: one live send) | Real email lands, found by Message-ID, VERIFIED |
-| 9 | Harness | Direct vs Shielded numbers on the dashboard |
+| **1** | **Vertical slice:** seed (contacts, files, Priya + stranger + 2 sensitive emails) → handles → `search(share_document)` with summaries → `propose_send_document` with WHO/WHAT/POLICY/CONTENT/LOCK → minimal approval page (login, card, Approve with seal) → FakeMail `send_raw` → `find_sent` read-back → VERIFIED. Exposed over **MCP**, with Claude driving it | Claude completes "send Priya the projections" through MCP on the sandbox; the stranger is BLOCKED; `test_seal`, `test_state_machine`, `test_approval_auth`, `test_verifier` green |
+| 2 | VERIFICATION_PENDING + retry + no-resend; tamper → FAILED | `test_verification_pending`, `test_lock` green |
+| 3 | Full seed (15 emails, events, A1–A5) + cleaner + labels + fixture-enumerated privacy test | A1–A3 quarantined; `test_guarantees` green with measured numbers |
+| 4 | **GmailMail adapter** (one live send) | Real email lands, found by Message-ID, VERIFIED |
+| 5 | Ledger receipts + SSE + dashboard panels (exposure, action card, timeline) | Cap-table receipt correct; readable from the back |
+| 6 | Comparison scenes: Direct vs Shielded, sensitive values exposed + task completed, as measured | Numbers on the dashboard |
+| 7 | Calendar, first cut: `free_slots` (free/busy only) | Returns slots; no titles or descriptions |
+| 8 | `propose_event`, `propose_reply`, harness 3× runs | If time allows |
 
-If time runs short, cut the harness first (replace it with one recorded Direct run), then dashboard polish. The live Gmail send stays in scope; FakeMail is the rehearsed fallback, not a substitute.
+If time runs short, cut from the bottom. The live Gmail send stays in scope; FakeMail is the rehearsed fallback, not a substitute.

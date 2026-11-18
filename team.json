@@ -1,9 +1,12 @@
 {
   "team_name": "Axon",
-  "project_title": "Axon Voice",
-  "one_liner": "A phone-call AI that executes a founder's post-meeting commitments safely: the AI talks, deterministic code decides, and nothing is done until it's verified.",
+  "project_title": "Shield",
+  "one_liner": "A user-owned trust layer for AI assistants: the model sees only what the task needs, can only propose actions, the user approves the exact payload, and nothing counts as done until Shield verifies it.",
   "track": "ai-agents",
   "members": [
-    { "name": "Sneha", "github": "sneha-asi" }
+    {
+      "name": "Sneha",
+      "github": "sneha-asi"
+    }
   ]
 }
