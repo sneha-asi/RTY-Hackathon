@@ -56,7 +56,11 @@ def list_files(shield: Shield, session_id: str, category: str = "") -> dict:
 
 
 def free_slots(shield: Shield, session_id: str, start: str, end: str) -> dict:
-    return _record(shield, session_id, "free_slots", shield.broker.free_slots(start, end))
+    try:
+        out = shield.broker.free_slots(shield.registry(session_id), start, end)
+    except (PermissionError, ValueError) as e:
+        return {"error": str(e)}
+    return _record(shield, session_id, "free_slots", out)
 
 
 def propose_send_document(shield: Shield, session_id: str, request: str, file: str, note: str = "") -> dict:

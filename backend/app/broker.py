@@ -172,11 +172,13 @@ class Broker:
                 "_released_ids": released_ids, "_quarantined_ids": quarantined_ids, "_withheld_ids": withheld_ids}
 
     def list_files(self, reg: HandleRegistry, category: str = "") -> dict:
+        """Only shareable files in the policy's categories (the same policy that governs proposals)."""
         files, withheld = [], Counter()
+        allowed = set(reg.policy.get("categories", []))
         for f in self.seed.files:
             if category and f.category != category:
                 continue
-            if not f.shareable:
+            if not f.shareable or f.category not in allowed:
                 for lab in f.sensitivity:
                     withheld[lab] += 1
                 continue
@@ -184,7 +186,8 @@ class Broker:
             files.append({"handle": h.handle, **h.attrs})
         return {"files": files, "withheld": dict(withheld)}
 
-    def free_slots(self, start: str, end: str) -> dict:
+    def free_slots(self, reg: HandleRegistry, start: str, end: str) -> dict:
+        self._check_purpose(reg, "schedule")
         busy = sorted((i.start, i.end) for i in self.seed.items if i.kind == "event" and i.start and start <= i.start[:10] <= end)
         return {"busy": [{"start": s, "end": e} for s, e in busy],
                 "note": "Free/busy only. Titles and descriptions are withheld."}

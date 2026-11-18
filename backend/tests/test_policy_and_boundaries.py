@@ -123,3 +123,19 @@ def test_receipt_cap_table_counts_from_ledger(shield):
     out = receipts.answer(shield, "Did any AI see my cap table today?")
     assert out["released"] == 0 and out["withheld"] >= 1
     assert out["answer"].startswith("Shield released the cap table 0 times and withheld it")
+
+
+def test_dev_endpoints_need_owner():
+    from fastapi.testclient import TestClient
+    from app.main import app, shield as live
+    c = TestClient(app)
+    assert c.post("/dev/reset").status_code == 401
+    assert c.post("/dev/tamper/proj_v3").status_code == 401
+    assert c.post("/dev/reset", headers={"X-Shield-Secret": live.settings.user_secret}).status_code == 200
+
+
+def test_list_files_and_free_slots_follow_policy(shield):
+    files = tools.list_files(shield, S)["files"]
+    assert {f["category"] for f in files} <= {"projections", "teaser"}
+    shield.registry("p2").policy["purposes"] = ["share_document"]
+    assert "error" in tools.free_slots(shield, "p2", "2026-11-18", "2026-11-25")

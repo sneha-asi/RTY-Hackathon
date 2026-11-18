@@ -82,6 +82,10 @@ def state(shield_owner: str | None = Cookie(default=None)):
                                                     "status_text": shield.guard.status_text(a)} for a in actions],
         "model_view": shield.model_view[-20:] if authed else [],
         "mail_backend": shield.settings.mail_backend,
+        # I10: the sandbox mailbox is reachable only through Shield; for a real provider exclusivity can't be
+        # checked from here (a missing visible grant doesn't prove it), so it is reported as unknown.
+        "sole_path": "yes (sandbox mailbox)" if shield.settings.mail_backend == "fake" else "unknown",
+        "policy": next((k for k, v in shield.policies.items() if v.get("enabled")), None),
         "harness": HARNESS,
         "sent_folder": _sent_folder(),
     }
@@ -166,21 +170,25 @@ async def events(since: int = 0, shield_owner: str | None = Cookie(default=None)
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-def _dev():
+def _dev(req: Request, token: str | None):
+    """Dev endpoints: enabled by SHIELD_ENABLE_DEV, owner only (cookie or X-Shield-Secret header for scripts)."""
     if not shield.settings.enable_dev:
         raise HTTPException(404)
+    header = req.headers.get("x-shield-secret", "")
+    if not (_user(token) or (header and hmac.compare_digest(header, shield.settings.user_secret))):
+        raise HTTPException(401, "login required")
 
 
 @app.post("/dev/reset")
-def dev_reset():
-    _dev()
+def dev_reset(req: Request, shield_owner: str | None = Cookie(default=None)):
+    _dev(req, shield_owner)
     shield.reset(wipe_journal=True)
     return {"ok": True}
 
 
 @app.post("/dev/tamper/{file_id}")
-def dev_tamper(file_id: str):
-    _dev()
+def dev_tamper(file_id: str, req: Request, shield_owner: str | None = Cookie(default=None)):
+    _dev(req, shield_owner)
     f = shield.seed.file(file_id)
     if not f:
         raise HTTPException(404)
@@ -190,8 +198,8 @@ def dev_tamper(file_id: str):
 
 
 @app.post("/dev/mail_fault")
-async def dev_mail_fault(req: Request):
-    _dev()
+async def dev_mail_fault(req: Request, shield_owner: str | None = Cookie(default=None)):
+    _dev(req, shield_owner)
     body = await req.json()
     if hasattr(shield.mail, "fail_mode"):
         shield.mail.fail_mode = body.get("mode")

@@ -1,6 +1,7 @@
 """Wires the pieces together. One process-wide Shield; per-session handle registries."""
 from __future__ import annotations
 
+import copy
 import os
 
 from .broker import Broker
@@ -48,5 +49,5 @@ class Shield:
         if session_id not in self.sessions:
             # bind the session to the founder's enabled standing policy (M0: investor_followups)
             name, pol = next(((k, v) for k, v in self.policies.items() if v.get("enabled")), ("", {}))
-            self.sessions[session_id] = HandleRegistry(self.seed, name, pol)
+            self.sessions[session_id] = HandleRegistry(self.seed, name, copy.deepcopy(pol))
         return self.sessions[session_id]

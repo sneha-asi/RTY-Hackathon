@@ -49,8 +49,8 @@ Only Priya's card is approved on stage. Leave Karan's card awaiting approval (or
 
 ## Optional extras (if time)
 
-- **Tamper.** After step 3, before approving, run `curl -X POST http://127.0.0.1:8000/dev/tamper/proj_v3` → approve → ❌ FAILED "changed after approval", nothing in Sent. Run the reset script afterwards.
-- **Timeout.** Before approving, run `curl -X POST -H 'Content-Type: application/json' -d '{"mode":"timeout_after_send"}' http://127.0.0.1:8000/dev/mail_fault` → approve → ⏳ VERIFICATION PENDING → ✅ VERIFIED, one message in Sent.
+- **Tamper.** After step 3, before approving, run `curl -X POST -H "X-Shield-Secret: $SHIELD_USER_SECRET" http://127.0.0.1:8000/dev/tamper/proj_v3` → approve → ❌ FAILED "changed after approval", nothing in Sent. Run the reset script afterwards.
+- **Timeout.** Before approving, run `curl -X POST -H "X-Shield-Secret: $SHIELD_USER_SECRET" -H "Content-Type: application/json" -d '{"mode":"timeout_after_send"}' http://127.0.0.1:8000/dev/mail_fault` → approve → ⏳ VERIFICATION PENDING → ✅ VERIFIED, one message in Sent.
 - **Second assistant.** Any MCP client can connect to the same `http://127.0.0.1:8765/mcp` under the same policy (B3).
 
 ## If something breaks

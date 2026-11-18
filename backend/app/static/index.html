@@ -74,7 +74,7 @@ function renderHarness(h){if(!h||h.status==='not run')return;if(h.status!=='done
 async function ask(){const r=await fetch('/api/receipts?q='+encodeURIComponent($('q').value));$('answer').textContent=(await r.json()).answer}
 function renderAction(a){
   const checks=a.checks.map(c=>`<div class="check"><b>${c.name}</b><span class="${c.status}">${icon[c.status]}</span><span>${esc(c.detail)}</span></div>`).join('');
-  const p=a.payload?`<div class="payload"><b>To:</b> ${esc(a.payload.to.join(', '))}\n<b>Subject:</b> ${esc(a.payload.subject)}\n<b>Attachment:</b> ${esc(a.payload.file_name)} · sha256 ${esc(a.payload.attachment_sha256.slice(0,16))}…\n\n${esc(a.payload.body)}</div><div class="mono">seal ${esc((a.seal||'').slice(0,16))}… · request ${esc(a.args.request)}</div>`:'';
+  const p=a.payload?`<div class="payload"><b>To:</b> ${esc(a.payload.to.join(', '))}\n<b>Subject:</b> ${esc(a.payload.subject)}\n<b>Attachment:</b> ${a.payload.file_name?esc(a.payload.file_name)+' · sha256 '+esc(a.payload.attachment_sha256.slice(0,16))+'…':'none'}\n\n${esc(a.payload.body)}</div><div class="mono">seal ${esc((a.seal||'').slice(0,16))}… · ${esc(a.args.request?'request '+a.args.request:'thread '+(a.args.thread||''))}</div>`:'';
   const btn=a.state==='AWAITING_APPROVAL'?`<br><button onclick="act('${a.id}','approve','${a.seal}')">Approve exactly this</button> <button class="secondary" onclick="act('${a.id}','reject')">Reject</button>`:'';
   return `<div class="card"><div class="state ${a.state}">${a.state.replace('_',' ')}</div><p>${esc(a.status_text)}</p>${checks}${p}${btn}</div>`}
 function renderSeen(v){
@@ -88,7 +88,7 @@ function renderSeen(v){
 async function refresh(){
   const s=await (await fetch('/api/state')).json();
   if(!s.authed){$('login').hidden=false;$('app').hidden=true;return}
-  $('login').hidden=true;$('app').hidden=false;$('backend').textContent='mail: '+s.mail_backend;
+  $('login').hidden=true;$('app').hidden=false;$('backend').textContent=`policy: ${s.policy} · mail: ${s.mail_backend} · sole path: ${s.sole_path}`;
   $('c-sens').textContent=s.counters.sensitive_values_exposed;$('c-rel').textContent=s.counters.released;$('c-q').textContent=s.counters.quarantined;$('c-b').textContent=s.counters.blocked;$('c-v').textContent=s.counters.verified;
   $('actions').innerHTML=s.actions.length?s.actions.map(renderAction).join(''):'<p class="withheld">No proposals yet.</p>';
   renderHarness(s.harness);$('sent').innerHTML=(s.sent_folder||[]).length?s.sent_folder.map(m=>`<div class="item"><b>To:</b> ${esc(m.to.join(', '))} · <b>${esc(m.subject)}</b><br><span class="mono">${m.attachments.map(a=>esc(a.name)+' sha256 '+esc(a.sha256)+'…').join(', ')} · ${esc(m.message_id)}</span></div>`).join(''):'<p class="withheld">Nothing sent.</p>';$('seen').innerHTML=s.model_view.length?s.model_view.slice().reverse().map(renderSeen).join(''):'<p class="withheld">Nothing yet.</p>'}
