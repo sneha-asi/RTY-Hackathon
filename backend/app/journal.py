@@ -1,5 +1,6 @@
 """Send-attempt journal (LLD §5.4). Written and fsynced BEFORE the provider call so no-resend survives restarts.
-Holds action ids, Message-IDs, seals and states only — no bodies or attachments (I8)."""
+Holds the sealed payload needed to verify after a restart (recipient, subject, body, hashes, Message-ID) but never
+attachment bytes. Lives in the local, git-ignored runtime directory; the shared ledger stays content-free (I8)."""
 from __future__ import annotations
 
 import json

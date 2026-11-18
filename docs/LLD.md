@@ -566,7 +566,7 @@ def approve(action_id, user, seal_from_screen) -> Action:
 
 `raw` is the exact byte string whose hash was checked; `send_raw` transmits it unchanged (Gmail: `messages.send` with `raw=base64url(raw)`). Nothing is re-read or rebuilt between the check and the send.
 
-**Durable marker.** Before `send_raw`, `journal.attempt(action)` appends the action (ids, seal, Message-ID; no body bytes) to `runtime/send_journal.jsonl` and fsyncs. Terminal outcomes append `outcome`. On startup `guard.recover()` loads every attempt without an outcome as VERIFICATION_PENDING and schedules verification only. `approve` also refuses to send if the journal already holds an attempt for that action.
+**Durable marker.** Before `send_raw`, `journal.attempt(action)` appends the action with its sealed payload (recipient, subject, body, hashes, Message-ID; **no attachment bytes**) to `runtime/send_journal.jsonl` (local, git-ignored; needed to verify after a restart) and fsyncs. Terminal outcomes append `outcome`. On startup `guard.recover()` loads every attempt without an outcome as VERIFICATION_PENDING and schedules verification only. `approve` also refuses to send if the journal already holds an attempt for that action.
 
 **Never resend.** No code path calls `send_raw` when `a.send_attempted` is true. `approve` on any state other than `AWAITING_APPROVAL` returns the action unchanged, and there is no "retry send" endpoint; a user who wants to try again makes a new proposal, which gets a new seal and needs a new approval.
 
