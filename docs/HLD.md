@@ -12,7 +12,7 @@
 
 ## 1. What this system does
 
-**For whom:** executives (founders first), because they deal with a lot of sensitive information, much of it other people's (PRD §1). **Against what:** personal assistants that ask for access to everything, with **Instinct, Muse and OpenClaw** as the focus.
+**For whom:** executives (demo workflow: investor follow-ups), because they deal with a lot of sensitive information, much of it other people's (PRD §1). **Against what:** personal assistants that ask for access to everything, with **Instinct, Muse and OpenClaw** as the focus.
 
 Shield sits between a person's AI assistants and the accounts those assistants can reach. Two kinds of traffic pass through it, and each has one path:
 
@@ -127,8 +127,8 @@ How each focus assistant is reached (PRD §1):
 
 | Assistant | Mode(s) | M0 |
 |---|---|---|
-| Instinct (closed, own login) | 3 Contain (mirror inbox) + 4 Watch & revoke | Compatibility target, pending testing |
-| Muse (desktop agent) | 2 Edge + 3 Contain + 4 Watch & revoke | Compatibility target, pending testing |
+| Instinct (closed, own login) | 3 Contain (mirror inbox) + 4 Watch & revoke | Roadmap experiment until tested |
+| Muse (desktop agent) | 2 Edge + 3 Contain + 4 Watch & revoke | Roadmap experiment until tested |
 | OpenClaw (user-run) | 1 Enforce if its tools can point at Shield [U]; else 2 Edge | Roadmap |
 | Claude (MCP connector) | 1 Enforce | **Demo client**: proves the mechanism end to end |
 

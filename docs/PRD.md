@@ -2,6 +2,8 @@
 
 **The user-side trust layer for personal AI assistants: a shield around everything an assistant can reach.**
 
+An executive sets one standing policy for what their AI assistant can learn and what it can propose. The assistant can prepare a confidential share without opening the file. The executive approves the exact outgoing message, and Shield verifies what was sent.
+
 > **The AI proposes. The code decides. Nothing is done until it's proven.**
 
 | Field | Detail |
@@ -26,10 +28,10 @@ The full product is described in §1–§9. What we build in four hours is in **
 |---|---|---|
 | B1 | **The value of an assistant grows with what it can reach, and so does the damage it can do.** People either grant everything and carry the risk, or grant little and get little | Make *more* delegation safe, not less. Success is tasks delegated safely, not attacks blocked |
 | B2 | **The user bears the loss; the assistant vendor marks its own homework.** A vendor's controls protect its product and are audited by the vendor | Be owned by the user and sit outside any one vendor |
-| B3 | **People use several assistants and switch between them.** Rules tied to one assistant are rewritten for each | Apply one policy across every supported assistant |
+| B3 | **People use several assistants and switch between them.** Rules tied to one assistant are rewritten for each | Apply one policy across supported assistants |
 | B4 | **Trust comes from evidence, not promises.** "We ask before sending" can't be checked by the user | Show what was released, withheld, approved and verified, from records |
 | B5 | **Friction kills delegation.** If every step needs a click, people turn the safety off | Gate only outward and irreversible actions; let proven narrow actions earn autonomy later |
-| B6 | **The pain is concentrated where a mistake is expensive.** Everyone faces the same attack, but cost and willingness to pay concentrate in people whose accounts hold *other people's* confidential data and whose messages carry *authority*: executives. Founders are the earliest adopters among them, and have no IT team behind them; investor follow-ups are frequent, valuable and risky | Target executives; enter through founders with one concrete job: "Handle my investor follow-ups" |
+| B6 | **The pain is concentrated where a mistake is expensive.** Everyone faces the same attack, but cost and willingness to pay concentrate in executives: they deal with a lot of sensitive information, much of it other people's, and their messages carry authority | Executives are the target users. Investor follow-ups are the demo workflow: frequent, valuable, and risky |
 
 ### Technical: what must be true for B1–B6 to hold
 
@@ -83,7 +85,7 @@ Many other assistants exist (ChatGPT, Claude, Gemini, Copilot, Dots); the same l
 
 **What M0 shows, honestly:** Instinct and Muse can't be placed behind a third-party layer today, because they log in with their own credentials. The hackathon demo therefore uses an MCP-capable assistant (Claude) in Enforce mode to prove the mechanism end to end, and presents Contain and Edge (how Shield reaches Instinct, Muse and OpenClaw) as the roadmap.
 
-**Founders are the first segment:** the earliest adopters of personal assistants among executives, holding the most sensitive data in the company (term sheets, cap tables, hiring, board matters), with no IT or security team behind them.
+**Demo workflow:** investor follow-ups. The demo executive is a founder answering investor document requests.
 
 **Not the target (yet):** casual users such as students. They face the same attack, but the worst case is mostly personal and they rarely pay for protection. They benefit later if Shield becomes a default layer.
 
@@ -165,7 +167,7 @@ The honest claim: **full guarantees in mode 1; strong containment in modes 2–3
   - re-checks the grants periodically (mode 4) and shows **"sole path: yes / no / unknown"** per account. A missing visible grant doesn't prove exclusivity, so where direct access can't be checked the answer is **unknown**;
   - downgrades its own claim for that account from Enforce to Watch while a bypass grant exists.
 - **Data boundary.** Raw data processing, credentials, the executor and approval previews run on the user's machine or infrastructure they control. Only the filtered, authenticated MCP surface is exposed to a remote assistant. Files the user uploads directly to an assistant are outside this path.
-- **Instinct and Muse are compatibility targets, pending testing.** The modes below say how Shield would reach them; none is claimed until tested.
+- **Instinct and Muse are roadmap experiments until tested.** The modes below say how Shield would reach them; none is claimed until tested.
 - It does **not** mean every control works with every assistant. The matrix below says which controls each integration supports.
 
 | Control | Mode 1: MCP connector (Claude, ChatGPT dev mode, Cursor, custom agents) | Mode 2: Edge (local proxy / browser extension) | Mode 3: Mirror (closed assistants) | Mode 4: Watch (any account) |
@@ -220,8 +222,7 @@ Guarantees depend on the access path. We state them per path and never claim mor
 | Persona | Needs |
 |---|---|
 | **Executive** (target user): founder, CXO, VP, fund partner | Delegate follow-ups, scheduling and document requests without exposing third-party data; never send to someone unapproved; proof of what went out |
-| **Founder** (first segment) | Same, centred on investors: requests for projections, data rooms, updates; NDAs decide who sees what |
-| EA / chief of staff | Approve pending actions from one screen; audit what the assistant saw and did |
+| **Executive's EA / chief of staff** | Reviews the same approval cards and receipts on the executive's behalf |
 | Security-minded developer | Point any MCP agent at Shield and get safe tools; policies are readable code |
 | The assistant itself | Handles it can reason with; a status it can relay word for word |
 

@@ -118,11 +118,11 @@ See [RULES.md](RULES.md) for the full list.
 
 ## Your project
 
-**Shield**: a user-owned trust layer between personal AI assistants and the accounts they can reach.
+**Shield**: an executive sets one standing policy for what their AI assistant can learn and what it can propose. The assistant can prepare a confidential share without opening the file. The executive approves the exact outgoing message, and Shield verifies what was sent.
 
 - **Team:** Axon (Sneha, `sneha-asi`)
 - **Track:** `ai-agents`, Build for AI Agents
-- **Problem:** Executives, founders first, deal with a lot of sensitive information, much of it other people's: term sheets, cap tables, layoff plans, investor data. Assistants like Instinct, Muse and OpenClaw ask for access to everything, and each has gone wrong: Instinct emailed an investor unasked, OpenClaw mass-deleted an inbox, Muse shipped with a backdoor-grade zero-day. An assistant that combines private data, untrusted content and a way to act outward can be steered by anything it reads, and a model can't be made to reliably refuse. Vendors' own controls protect their own product and are audited by the vendor.
+- **Problem:** Executives deal with a lot of sensitive information next to routine work: term sheets, cap tables and layoff plans sit beside investor follow-ups, and much of it is other people's data. Their outgoing messages carry authority. Assistants like Instinct, Muse and OpenClaw ask for access to all of it; Instinct emailed an investor "without checking with me first". An assistant that combines private data, untrusted content and a way to act outward can be steered by anything it reads, and a model can't be made to reliably refuse. Vendors' controls are per assistant and self-audited.
 - **What we built:** an MCP server the assistant connects to instead of Gmail.
   - **One standing policy** (the founder enables "investor follow-ups" once) governs both what the assistant learns and what it may propose.
   - **Reads:** the assistant gets only handles (`THREAD_1`, `FILE_2`) and summaries that Shield writes itself, never email text, addresses or file contents. Unrelated sensitive mail appears only as withheld counts. Hidden-instruction emails are quarantined.
@@ -134,7 +134,7 @@ See [RULES.md](RULES.md) for the full list.
   - A send-attempt marker is flushed to a local journal before the provider call. A timeout becomes `VERIFICATION_PENDING` and is only ever re-verified, never resent, even after a restart.
   - A Sent record that differs from the approval is `UNVERIFIED` with the differing field. `FAILED` is reserved for messages that definitely weren't sent.
   - The MCP listener is a separate app, so a tunnel to it can't reach approval or raw data.
-  - 29 tests cover the checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value ever reaches the model.
+  - The demo validates the core enforcement path, and the 29-test suite checks the M0 invariants: the five checks, state machine, seal, no-resend, restart recovery, listener isolation, and a fixture-enumerated test that no planted sensitive value reaches the model.
 - **How to run it:**
   ```bash
   cd backend && pip install -r requirements.txt && cp .env.example .env   # set SHIELD_USER_SECRET

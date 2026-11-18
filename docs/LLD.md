@@ -5,7 +5,7 @@
 | Team | Axon |
 | Product | Shield |
 | Scope | M0: Enforce mode (MCP) for email, files and calendar free/busy (PRD §10) |
-| Users | Executives, founders first (PRD §1). Demo user: a founder handling investor follow-ups |
+| Users | Executives (PRD §1). Demo workflow: investor follow-ups |
 | Demo client | Claude over MCP (Enforce mode). Instinct, Muse and OpenClaw are reached through Contain / Edge / Watch on the roadmap (PRD §1, §4; HLD §5) |
 | Related docs | [PRD](PRD.md) (first principles B1–B6, invariants I1–I10, requirements F1–F23) · [HLD](HLD.md) (design principles D1–D9, trust boundaries) · [One-pager](ONE_PAGER.md) |
 

@@ -71,6 +71,8 @@ def state(shield_owner: str | None = Cookie(default=None)):
         "authed": authed,
         "counters": {
             "tool_calls": len(shield.model_view),
+            "released": sum(1 for v in shield.model_view for i in v["result"].get("items", []) if i.get("status") == "released")
+                        + sum(len(v["result"].get("files", [])) for v in shield.model_view),
             "sensitive_values_exposed": exposure,
             "quarantined": len({e["item_id"] for e in shield.ledger.all() if e["kind"] == "quarantine"}),
             "blocked": sum(a.state.value == "BLOCKED" for a in actions),
