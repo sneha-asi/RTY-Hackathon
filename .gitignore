@@ -35,3 +35,4 @@ runtime/
 backend/runtime/
 token_*.json
 token_watch.json
+!.env.live.example
