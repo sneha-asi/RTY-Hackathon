@@ -4,14 +4,33 @@
 set -euo pipefail
 cd "$(dirname "$0")/../backend"
 
-PY=python3
-command -v $PY >/dev/null || { echo "Python 3 not found. On a Mac run: xcode-select --install  (then re-run this)"; exit 1; }
+# Find a working Python 3.11+ WITHOUT triggering Apple's Xcode installer (/usr/bin/python3 is only a stub
+# unless the Command Line Tools are installed). If none is found, download a standalone Python with uv.
+PY=""
+for cand in /opt/homebrew/bin/python3 /usr/local/bin/python3 /Library/Frameworks/Python.framework/Versions/3.1*/bin/python3 "$HOME/.local/bin/python3"; do
+  if [ -x "$cand" ] && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then PY="$cand"; break; fi
+done
+if [ -z "$PY" ] && [ "$(uname)" != "Darwin" ] && command -v python3 >/dev/null && python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
+  PY="$(command -v python3)"
+fi
+if [ -z "$PY" ] && [ "$(uname)" = "Darwin" ] && xcode-select -p >/dev/null 2>&1 && /usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+  PY=/usr/bin/python3
+fi
 
 if [ ! -d .venv ]; then
-  echo "→ Installing Shield (first run only, ~1 min)…"
-  $PY -m venv .venv
-  ./.venv/bin/pip install -q --upgrade pip
-  ./.venv/bin/pip install -q -e ".[gmail,test]"
+  echo "→ Installing Shield (first run only, ~1-2 min)…"
+  if [ -n "$PY" ]; then
+    "$PY" -m venv .venv
+  else
+    echo "→ No usable Python found; downloading a standalone Python with uv (no Xcode needed)…"
+    UV="$HOME/.local/bin/uv"
+    [ -x "$UV" ] || curl -LsSf https://astral.sh/uv/install.sh | sh
+    [ -x "$UV" ] || UV="$(command -v uv)"
+    "$UV" venv --python 3.12 .venv
+    "$UV" pip install --python .venv/bin/python -q pip
+  fi
+  ./.venv/bin/python -m pip install -q --upgrade pip
+  ./.venv/bin/python -m pip install -q -e ".[gmail,test]"
 fi
 
 if [ ! -f .env ]; then
