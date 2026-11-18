@@ -13,7 +13,7 @@ A layer the user owns that sits between AI assistants and **everything they can 
 - **B3** People use several assistants. So one policy applies across all of them.
 - **B4** Trust needs evidence. So Shield shows what was released, withheld, approved and verified.
 - **B5** Friction kills delegation. So only outward and irreversible actions are gated.
-- **B6** Start with founders (most third-party data, earliest adopters) and one job: *"Handle my investor follow-ups."*
+- **B6** The pain concentrates where a mistake is expensive: **executives** (founders, CXOs, VPs, fund partners), whose accounts hold other people's confidential data and whose messages carry authority. Everyone faces the same attack, but a student's worst case is mostly personal and they rarely pay. **Founders are the first segment** (earliest adopters, no IT team behind them), with one job: *"Handle my investor follow-ups."*
 
 ## The problem
 

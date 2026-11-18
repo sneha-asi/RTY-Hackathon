@@ -14,7 +14,7 @@
 
 Confidence labels for external facts: **[V]** checked against the primary source · **[L]** secondary source, likely true · **[U]** unverified, don't cite on stage.
 
-The full product is described in §1–§9. What we build in four hours is in **§10 Hackathon scope**. All three documents share the IDs below: business principles **B1–B6** and invariants **I1–I10**.
+The full product is described in §1–§9. What we build in four hours is in **§10 Hackathon scope**. All four documents share the IDs below: business principles **B1–B6** and invariants **I1–I10**.
 
 ---
 
@@ -29,7 +29,7 @@ The full product is described in §1–§9. What we build in four hours is in **
 | B3 | **People use several assistants and switch between them.** Rules tied to one assistant are rewritten for each | Apply one policy across every supported assistant |
 | B4 | **Trust comes from evidence, not promises.** "We ask before sending" can't be checked by the user | Show what was released, withheld, approved and verified, from records |
 | B5 | **Friction kills delegation.** If every step needs a click, people turn the safety off | Gate only outward and irreversible actions; let proven narrow actions earn autonomy later |
-| B6 | **Start where sensitivity × adoption is highest.** Founders hold third-party data (investors, employees, cap tables) and adopt assistants early; investor follow-ups are frequent, valuable and risky | Win the founder wedge with one concrete job first: "Handle my investor follow-ups" |
+| B6 | **The pain is concentrated where a mistake is expensive.** Everyone faces the same attack, but cost and willingness to pay concentrate in people whose accounts hold *other people's* confidential data and whose messages carry *authority*: executives. Founders are the earliest adopters among them, and have no IT team behind them; investor follow-ups are frequent, valuable and risky | Target executives; enter through founders with one concrete job: "Handle my investor follow-ups" |
 
 ### Technical: what must be true for B1–B6 to hold
 
@@ -67,7 +67,16 @@ The root cause is the lethal trifecta: **private data + untrusted content + a wa
 
 ## 1. Problem (who and why)
 
-**Who:** anyone who delegates to a personal AI assistant. Assistants like Instinct, Muse and OpenClaw ask for access to *everything*: email, calendar, files, messages, browser, contacts, bank and shopping accounts, the laptop itself. **Founders are our first users:** they hold the most sensitive data in a company (term sheets, cap tables, hiring, board matters), most of it other people's, and they adopt assistants early. Today the choice is "give it everything" or "don't use one".
+**Who:** executives who delegate to a personal AI assistant: founders, CXOs, VPs, fund partners. Assistants like Instinct, Muse and OpenClaw ask for access to *everything*: email, calendar, files, messages, browser, contacts, bank accounts, the laptop itself. We define the user by two properties, not a title:
+
+1. **Their accounts hold other people's confidential data:** investors, employees, customers, the board.
+2. **Their messages carry authority:** a sent email commits the company, shares a data room or moves money.
+
+For them a leak or a wrong send has legal, financial and reputational cost, much of it borne by third parties. They also tend to run personal assistants on personal accounts, outside what company IT protects. Today their choice is "give it everything" or "don't use one".
+
+**Founders are the first segment:** the earliest adopters of personal assistants among executives, holding the most sensitive data in the company (term sheets, cap tables, hiring, board matters), with no IT or security team behind them.
+
+**Not the target (yet):** casual users such as students. They face the same attack, but the worst case is mostly personal and they rarely pay for protection. They benefit later if Shield becomes a default layer.
 
 **Why it happens:** an assistant that combines **(1) private data, (2) untrusted content and (3) a way to act or send outward** can be steered by instructions hidden in anything it reads. This is Simon Willison's *lethal trifecta* [V]. The more an assistant can reach, the more doors there are on all three legs. Detection doesn't fix it: a 99%-effective injection classifier is still an "unacceptable risk" (Willison) [V].
 
@@ -199,7 +208,8 @@ Guarantees depend on the access path. We state them per path and never claim mor
 
 | Persona | Needs |
 |---|---|
-| Founder using an AI assistant (first users) | Delegate scheduling, investor requests and follow-ups without exposing third-party data; never send to someone unapproved |
+| **Executive** (target user): founder, CXO, VP, fund partner | Delegate follow-ups, scheduling and document requests without exposing third-party data; never send to someone unapproved; proof of what went out |
+| **Founder** (first segment) | Same, centred on investors: requests for projections, data rooms, updates; NDAs decide who sees what |
 | EA / chief of staff | Approve pending actions from one screen; audit what the assistant saw and did |
 | Security-minded developer | Point any MCP agent at Shield and get safe tools; policies are readable code |
 | The assistant itself | Handles it can reason with; a status it can relay word for word |
